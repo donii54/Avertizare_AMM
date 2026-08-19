@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avertizări Meteorologice</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#EEF4FB',
+              100: '#D7E6F6',
+              200: '#B7D2EE',
+              600: '#1E4B8E',
+              700: '#163A6E',
+              900: '#0F2749'
+            },
+            code: { yellow: '#FFED00', orange: '#FF8A00', red: '#FF0000', green: '#28D762' }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          borderRadius: { widget: '16px' }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { font-family: Inter, system-ui, sans-serif; }
+    .page { height: 100vh; display: flex; flex-direction: column; }
+    .widget {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .dashboard {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    .map-wrap, #map, #map.leaflet-container {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      background: transparent;
+    }
+    #map { cursor: pointer; }
+    .leaflet-container { background: transparent !important; }
+    .district-label {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: #14532d;
+      text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+      pointer-events: none;
+    }
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-block;
+      border: 1px solid rgba(15, 23, 42, 0.15);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.7);
+    }
+    .info-panel article:focus,
+    .info-panel article:focus-visible {
+      outline: none;
+    }
+    .popup-map {
+      position: relative;
+      align-self: stretch;
+    }
+    .popup-map img {
+      position: absolute;
+      inset: 8px;
+      width: calc(100% - 16px);
+      height: calc(100% - 16px);
+      object-fit: contain;
+      object-position: center;
+    }
+    @media (max-width: 900px) {
+      html, body { overflow: auto; }
+      .page, .widget, .dashboard { height: auto; display: block; }
+      .map-wrap, #map { height: 72vh; min-height: 520px; width: 100%; }
+      .info-panel {
+        position: static !important;
+        width: 100% !important;
+        margin-top: 16px;
+        max-height: none !important;
+      }
+      .alert-content { flex-direction: column; }
+      .popup-map { width: 100% !important; min-height: 280px; }
+    }
+  </style>
+</head>
+<body class="bg-[#F4F6F8] text-slate-800">
+  <main class="page px-6 py-5 lg:px-8">
+    <header class="mb-4 shrink-0">
+      <nav class="mb-2 flex items-center gap-2 text-[13px] font-medium text-slate-400">
+        <span>Acasă</span>
+        <span>›</span>
+        <span class="text-brand-600">Avertizări Meteorologice</span>
+      </nav>
+      <h1 class="text-[40px] font-extrabold leading-none tracking-[0.04em] text-brand-600">PROGNOZE</h1>
+    </header>
+
+    <section class="widget overflow-hidden rounded-widget bg-[#E4F0F8] px-6 pb-6 pt-5">
+      <h2 class="mb-3 shrink-0 text-[22px] font-extrabold tracking-[0.06em] text-brand-600">AVERTIZĂRI METEOROLOGICE</h2>
+      <div class="dashboard">
+        <div class="map-wrap">
+          <div id="map"></div>
+        </div>
+        <aside class="info-panel absolute right-0 top-0 z-[500] flex h-full w-[420px] flex-col pl-4">
+          <ul class="mb-4 flex flex-col gap-3 text-[15px] font-medium text-brand-600">
+            <li class="flex items-center gap-3"><span class="legend-dot" style="background:#28D762"></span> scăzut</li>
+            <li class="flex items-center gap-3"><span class="legend-dot" style="background:#FFED00"></span> mediu</li>
+            <li class="flex items-center gap-3"><span class="legend-dot" style="background:#FF8A00"></span> ridicat</li>
+            <li class="flex items-center gap-3"><span class="legend-dot" style="background:#FF0000"></span> foarte mare</li>
+          </ul>
+          <div id="phenomena-panel" class="min-h-0 flex-1 overflow-y-auto pr-1"></div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast-stack" class="pointer-events-none fixed right-5 top-5 z-[1100] flex w-[min(340px,calc(100vw-32px))] flex-col gap-3"></div>
+
+  <div id="overlay" class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-900/50 p-4" onclick="closePopup(event)">
+    <div class="relative max-h-[92vh] w-full max-w-6xl overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl" onclick="event.stopPropagation()">
+      <div class="sticky top-0 z-10 flex justify-end bg-white px-4 pt-3">
+        <button class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-lg leading-none text-slate-700 hover:bg-slate-200" onclick="closePopup()" aria-label="Închide">×</button>
+      </div>
+      <div class="px-6 pb-6" id="popup-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'moldova_weather_warnings';
+    const NORMAL_COLOR = '#28D762';
+    const shortCodes = {
+      "Briceni": "BR", "Ocnița": "OC", "Ocniţa": "OC", "Edineț": "ED", "Edineţ": "ED",
+      "Dondușeni": "DN", "Donduşeni": "DN", "Drochia": "DR", "Rîșcani": "RS", "Rîşcani": "RS",
+      "Glodeni": "GL", "Fălești": "FL", "Făleşti": "FL", "Sîngerei": "SG", "Sîngerei": "SG",
+      "Florești": "FR", "Floreşti": "FR", "Șoldănești": "SD", "Şoldăneşti": "SD",
+      "Soroca": "SR", "Rezina": "RZ", "Telenești": "TL", "Teleneşti": "TL", "Orhei": "OR",
+      "Ungheni": "UN", "Călărași": "CL", "Călăraşi": "CL", "Nisporeni": "NS",
+      "Strășeni": "ST", "Străşeni": "ST", "Criuleni": "CR", "Dubăsari": "DB",
+      "Anenii Noi": "AN", "Ialoveni": "IL", "Hîncești": "HN", "Hînceşti": "HN",
+      "Cimișlia": "CM", "Cimişlia": "CM", "Leova": "LV", "Căușeni": "CS", "Căuşeni": "CS",
+      "Ștefan Vodă": "SV", "Ştefan Vodă": "SV", "Cantemir": "CT", "Cahul": "CH",
+      "Taraclia": "TR", "Basarabeasca": "BS",
+      "Chișinău": "CHIȘINĂU", "Chişinău": "CHIȘINĂU",
+      "Bălți": "Bălți", "Bălţi": "Bălți",
+      "Gagauzia": "UTAG", "Găgăuzia": "UTAG", "Unitatea Teritorială Autonomă Găgăuzia": "UTAG",
+      "Comrat": "UTAG", "Tiraspol": "Tiraspol", "Bender": "Bender", "Tighina": "Bender"
+    };
+
+    let map = null;
+    let geojsonLayer = null;
+    let districtWarnings = {};
+    let selectedWarningIndex = null;
+
+    function colorRank(color) {
+      if (!color) return 0;
+      const value = color.toLowerCase();
+      if (value.includes('ff0000') || value.includes('ef4444')) return 4;
+      if (value.includes('ff8a00') || value.includes('f97316')) return 3;
+      if (value.includes('ffed00') || value.includes('eab308')) return 2;
+      if (value.includes('28d762') || value.includes('22c55e')) return 1;
+      return 0;
+    }
+
+    function codeMeta(code) {
+      if (code.includes('ROȘU')) return { color: '#FF0000', box: 'bg-red-50 border-red-200', title: 'text-red-800' };
+      if (code.includes('PORTOCALIU')) return { color: '#FF8A00', box: 'bg-orange-50 border-orange-200', title: 'text-orange-800' };
+      if (code.includes('VERDE')) return { color: '#28D762', box: 'bg-emerald-50 border-emerald-200', title: 'text-emerald-800' };
+      return { color: '#FFED00', box: 'bg-amber-50 border-amber-200', title: 'text-amber-800' };
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '';
+      if (!value.includes('T')) return value;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${day}.${month}.${year}, ora ${hours}:${mins}`;
+    }
+
+    function formatInterval(item) {
+      if (item.intervalFrom && item.intervalTo) {
+        return `${formatDateTime(item.intervalFrom)} – ${formatDateTime(item.intervalTo)}`;
+      }
+      if (item.interval && item.interval.includes('T')) return formatDateTime(item.interval);
+      return item.interval || '';
+    }
+
+    function getExpiryTime(item) {
+      const value = item.intervalTo || (item.interval && item.interval.includes('T') ? item.interval : null);
+      if (!value) return null;
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? null : time;
+    }
+
+    function removeExpiredWarnings() {
+      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      const now = Date.now();
+      const next = data.filter(item => {
+        const expiry = getExpiryTime(item);
+        return expiry === null || expiry > now;
+      });
+      if (next.length !== data.length) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return true;
+      }
+      return false;
+    }
+
+    function getWarnings() {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    }
+
+    function codesHtml(codes) {
+      if (!codes || !codes.length) return '';
+      return `
+        <div class="mt-3 flex flex-col gap-2">
+          ${codes.map(c => {
+            const meta = codeMeta(c.code);
+            return `
+              <div class="rounded-xl border p-3 ${meta.box}">
+                <div class="mb-1 flex items-center gap-2 text-sm font-bold ${meta.title}">
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${meta.color}"></span>
+                  ${c.code}
+                </div>
+                <div class="text-[15px] leading-relaxed text-slate-700">${c.description || 'Fără descriere'}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function warningCardHtml(item, index) {
+      return `
+        <article class="mb-3 cursor-pointer rounded-xl border border-slate-200 bg-white p-4 outline-none transition hover:border-brand-200" data-warning="${index}" onclick="selectWarning(${index})">
+          <h3 class="text-base font-bold text-brand-700">${item.phenomenon || 'Avertizare meteorologică'}</h3>
+          <p class="mt-1 text-[11px] text-slate-500">${formatInterval(item) || formatDateTime(item.emitDate)}</p>
+          ${codesHtml(item.codes)}
+        </article>
+      `;
+    }
+
+    function renderPhenomenaPanel() {
+      const panel = document.getElementById('phenomena-panel');
+      const data = getWarnings();
+      if (data.length === 0) {
+        panel.innerHTML = '';
+        return;
+      }
+      panel.innerHTML = data.map((item, index) => warningCardHtml(item, index)).join('');
+      if (selectedWarningIndex != null) {
+        const card = panel.querySelector(`[data-warning="${selectedWarningIndex}"]`);
+        if (card) card.classList.add('bg-brand-50', 'shadow-sm');
+      }
+    }
+
+    function warningIcon() {
+      return `<svg class="h-5 w-5" viewBox="0 0 24 24" fill="#FFED00" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.2 2.4 20.4h19.2L12 3.2z"/><path d="M12 9.2v5.4" stroke="#111827" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1" fill="#111827"/></svg>`;
+    }
+
+    function legendHtml() {
+      return `
+        <div class="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-600">
+          <span>🔴 ROȘU</span>
+          <span>🟠 PORTOCALIU</span>
+          <span>🟡 GALBEN</span>
+          <span>🟢 VERDE</span>
+        </div>
+        <p class="mt-2 text-[11px] italic leading-relaxed text-slate-400">Notă: Informația are caracter informativ. În cazul pericolului iminent se vor emite avertizări actualizate.</p>
+      `;
+    }
+
+    function alertBlockHtml(item, index) {
+      const img = item.mapImage
+        ? `<img src="${item.mapImage}" alt="Harta" class="rounded-xl bg-slate-50">`
+        : `<div class="flex flex-1 items-center justify-center px-3 py-10 text-center text-sm text-slate-400">Fără hartă</div>`;
+      return `
+        <section class="mb-4 cursor-pointer border-b border-slate-100 pb-5 last:mb-0 last:border-b-0 last:pb-0" id="alert-${index}" onclick="selectWarning(${index})">
+          <div class="mb-3 flex items-center gap-2 text-sm font-extrabold tracking-wide text-red-600">${warningIcon()} AVERTIZĂRI METEOROLOGICE</div>
+          <div class="alert-content flex items-stretch gap-5">
+            <div class="popup-map min-h-[360px] w-[38%] min-w-[280px] max-w-[460px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2">${img}</div>
+            <div class="flex min-w-0 flex-1 flex-col rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <h3 class="mb-3 text-2xl font-extrabold text-slate-900">AVERTIZARE</h3>
+              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Data emiterii:</span> <span class="font-bold text-slate-900">${formatDateTime(item.emitDate) || '—'}</span></div>
+              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Fenomene:</span> <span class="font-bold text-slate-900">${item.phenomenon || '—'}</span></div>
+              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Intervalul de acțiune:</span> <span class="font-bold text-slate-900">${formatInterval(item) || '—'}</span></div>
+              ${codesHtml(item.codes)}
+            </div>
+          </div>
+          ${legendHtml()}
+        </section>
+      `;
+    }
+
+    function selectWarning(index) {
+      selectedWarningIndex = index;
+      applyMapColors();
+    }
+
+    function layerKeys(layer) {
+      const name = layer.feature.properties.shapeName ||
+                   layer.feature.properties.NAME ||
+                   layer.feature.properties.name;
+      const label = layer.feature.properties._label;
+      return { name, label };
+    }
+
+    function restoreLayer(layer) {
+      const { name, label } = layerKeys(layer);
+      const found = districtWarnings[name] || districtWarnings[label];
+      if (found && found.color) {
+        layer.setStyle({
+          fillColor: found.color,
+          fillOpacity: 0.9,
+          color: '#ffffff',
+          weight: 1.3
+        });
+      } else {
+        geojsonLayer.resetStyle(layer);
+      }
+    }
+
+    function applyMapColors() {
+      if (!geojsonLayer) return;
+      const warnings = getWarnings();
+      const source = selectedWarningIndex == null
+        ? warnings.map((warning, index) => ({ warning, index }))
+        : warnings[selectedWarningIndex]
+          ? [{ warning: warnings[selectedWarningIndex], index: selectedWarningIndex }]
+          : [];
+
+      const result = {};
+      source.forEach(({ warning, index }) => {
+        (warning.districts || []).forEach(district => {
+          const keys = [district.name, district.label].filter(Boolean);
+          keys.forEach(key => {
+            const current = result[key];
+            if (!current || colorRank(district.color) > colorRank(current.color)) {
+              result[key] = { color: district.color, warningIndex: index, warning };
+            }
+          });
+        });
+      });
+      districtWarnings = result;
+      geojsonLayer.eachLayer(restoreLayer);
+      renderPhenomenaPanel();
+    }
+
+    function initMap() {
+      map = L.map('map', {
+        zoomControl: false,
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        attributionControl: false,
+        preferCanvas: true,
+        zoomSnap: 0,
+        zoomDelta: 0.1
+      });
+
+      fetch('MD_MAP.geojson')
+        .then(r => r.json())
+        .then(data => {
+          geojsonLayer = L.geoJSON(data, {
+            style: {
+              color: '#ffffff',
+              weight: 1.3,
+              fillColor: NORMAL_COLOR,
+              fillOpacity: 0.9
+            },
+            onEachFeature: (feature, layer) => {
+              const fullName = feature.properties.shapeName ||
+                               feature.properties.NAME ||
+                               feature.properties.name || '???';
+              const label = shortCodes[fullName] || fullName;
+              layer.feature.properties._label = label;
+              layer.bindTooltip(label, {
+                permanent: true,
+                direction: 'center',
+                className: 'district-label'
+              });
+
+              layer.on({
+                mouseover: (e) => {
+                  e.target.setStyle({
+                    weight: 3,
+                    color: '#0f172a',
+                    fillOpacity: 0.98
+                  });
+                  e.target.bringToFront();
+                },
+                mouseout: (e) => {
+                  restoreLayer(e.target);
+                },
+                click: () => {
+                  const found = districtWarnings[fullName] || districtWarnings[label];
+                  if (found) selectWarning(found.warningIndex);
+                }
+              });
+            }
+          }).addTo(map);
+
+          function fitMapToCountry() {
+            if (!map || !geojsonLayer) return;
+            const el = map.getContainer();
+            if (!el.clientWidth || !el.clientHeight) return;
+            map.invalidateSize({ animate: false });
+            map.fitBounds(geojsonLayer.getBounds(), {
+              paddingTopLeft: [4, 12],
+              paddingBottomRight: [440, 12],
+              animate: false,
+              maxZoom: 20
+            });
+          }
+
+          fitMapToCountry();
+          requestAnimationFrame(fitMapToCountry);
+          setTimeout(fitMapToCountry, 50);
+          setTimeout(fitMapToCountry, 250);
+          window.addEventListener('resize', fitMapToCountry);
+          if (window.ResizeObserver) {
+            new ResizeObserver(fitMapToCountry).observe(document.getElementById('map'));
+          }
+          applyMapColors();
+        })
+        .catch(err => console.error(err));
+    }
+
+    function showStartupPopups() {
+      const data = getWarnings();
+      const list = document.getElementById('popup-list');
+      const overlay = document.getElementById('overlay');
+      if (!data.length) return;
+      list.innerHTML = data.map((item, index) => alertBlockHtml(item, index)).join('');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    function openPopup(index) {
+      showStartupPopups();
+      const block = document.getElementById('alert-' + index);
+      if (block) block.scrollIntoView({ block: 'nearest' });
+    }
+
+    function closePopup(e) {
+      if (e && e.target && e.target.id !== 'overlay') return;
+      const overlay = document.getElementById('overlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+    }
+
+    let expiryTimer = null;
+    function scheduleExpiryCheck() {
+      clearTimeout(expiryTimer);
+      if (removeExpiredWarnings()) {
+        closePopup();
+        applyMapColors();
+        showStartupPopups();
+      }
+      const data = getWarnings();
+      const now = Date.now();
+      const nextTimes = data.map(getExpiryTime).filter(time => time && time > now).sort((a, b) => a - b);
+      const delay = nextTimes.length ? Math.min(nextTimes[0] - now + 50, 30000) : 30000;
+      expiryTimer = setTimeout(scheduleExpiryCheck, Math.max(50, delay));
+    }
+
+    window.addEventListener('storage', () => {
+      scheduleExpiryCheck();
+      applyMapColors();
+      showStartupPopups();
+    });
+
+    initMap();
+    scheduleExpiryCheck();
+    renderPhenomenaPanel();
+    showStartupPopups();
+  </script>
+</body>
+</html>
