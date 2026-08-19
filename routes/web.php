@@ -1,16 +1,15 @@
 <?php
 
-use App\Http\Middleware\RequireAdminSession;
 use Illuminate\Support\Facades\Route;
 
-// Public pages are served as static files by the framework.
-// Only /admin requires authentication.
-
-Route::get('/admin', function () {
-    return file_get_contents(public_path('admin.html'));
-})->middleware(RequireAdminSession::class);
-
-// Public map (default page)
+// Public map
 Route::get('/', function () {
     return file_get_contents(public_path('index.html'));
+});
+
+// Admin panel — always serves admin.html.
+// Authentication is handled client-side: the page shows a login form
+// if the user is not authenticated (/api/me returns 401).
+Route::get('/admin', function () {
+    return file_get_contents(public_path('admin.html'));
 });

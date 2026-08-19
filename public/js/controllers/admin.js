@@ -371,8 +371,46 @@ async function startAdmin() {
   document.addEventListener('keydown', event => { if (event.key === 'Escape') closeCalendar(true); });
 }
 
+// ── Login form (embedded in admin.html) ──────────────────────────────────────
+function showLoginForm(errorMsg = '') {
+  document.body.classList.remove('logged-in');
+  const err = document.getElementById('login-error');
+  if (err && errorMsg) err.textContent = errorMsg;
+}
+
+function initLoginForm() {
+  const form = document.getElementById('login-form');
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const user     = document.getElementById('login-user').value.trim();
+    const password = document.getElementById('login-pass').value;
+    const error    = document.getElementById('login-error');
+    error.textContent = '';
+
+    try {
+      const res  = await fetch('/api/login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ user, password }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        startAdmin();
+      } else {
+        error.textContent = data.error || 'Login sau parolă incorectă';
+      }
+    } catch {
+      error.textContent = 'Eroare de conexiune';
+    }
+  });
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+  initLoginForm();
   const authed = await checkAuth();
-  if (!authed) { window.location.href = '/login.html'; return; }
-  startAdmin();
+  if (authed) {
+    startAdmin();
+  }
+  // If not authed — login-view is already visible via CSS (body without .logged-in)
 });
