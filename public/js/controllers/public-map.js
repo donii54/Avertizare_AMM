@@ -1,59 +1,53 @@
 /**
  * Controller: public-map
- * Drives the public-facing Moldova weather warnings page.
- * Depends on: models/warnings.js, district-codes.js (global districtLabel)
+ * Public-facing Moldova weather warnings page — reads from Laravel API.
+ * Depends on: models/warnings.js, district-codes.js
  */
 
 const PUBLIC_MAP_NORMAL_COLOR = '#28D762';
-const POPUP_DISMISSED_KEY = 'moldova_warnings_popup_dismissed';
-// New random ID per page load — popup auto-opens on reload,
-// but stays closed after user dismisses it (within the same page load).
-const POPUP_INSTANCE_ID = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const POPUP_DISMISSED_KEY     = 'moldova_warnings_popup_dismissed';
+const POPUP_INSTANCE_ID       = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-let publicMap         = null;
+let publicMap          = null;
 let publicGeojsonLayer = null;
-let districtWarnings  = {};
+let districtWarnings   = {};
 let selectedWarningIndex = null;
+let cachedWarnings     = [];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function escapeHtmlPublic(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function colorRank(color) {
   if (!color) return 0;
   const v = color.toLowerCase();
-  if (v.includes('ff0000') || v.includes('ef4444')) return 4;
-  if (v.includes('ff8a00') || v.includes('f97316')) return 3;
-  if (v.includes('ffed00') || v.includes('eab308')) return 2;
-  if (v.includes('28d762') || v.includes('22c55e')) return 1;
+  if (v.includes('ff0000')) return 4;
+  if (v.includes('ff8a00')) return 3;
+  if (v.includes('ffed00')) return 2;
+  if (v.includes('28d762')) return 1;
   return 0;
 }
 
 function codeMeta(code) {
-  if (code.includes('ROȘU'))      return { color: '#FF0000', box: 'bg-red-50 border-red-200',     title: 'text-red-800' };
+  if (code.includes('ROȘU'))       return { color: '#FF0000', box: 'bg-red-50 border-red-200',     title: 'text-red-800' };
   if (code.includes('PORTOCALIU')) return { color: '#FF8A00', box: 'bg-orange-50 border-orange-200', title: 'text-orange-800' };
-  if (code.includes('VERDE'))     return { color: '#28D762', box: 'bg-emerald-50 border-emerald-200', title: 'text-emerald-800' };
+  if (code.includes('VERDE'))      return { color: '#28D762', box: 'bg-emerald-50 border-emerald-200', title: 'text-emerald-800' };
   return { color: '#FFED00', box: 'bg-amber-50 border-amber-200', title: 'text-amber-800' };
 }
 
-// ── Warning card (side panel) ─────────────────────────────────────────────────
+// ── Side panel rendering ──────────────────────────────────────────────────────
 function codesHtml(codes) {
   if (!codes?.length) return '';
   return `<div class="mt-3 flex flex-col gap-2">${codes.map(c => {
-    const meta = codeMeta(c.code);
-    return `
-      <div class="rounded-xl border p-3 ${meta.box}">
-        <div class="mb-1 flex items-center gap-2 text-sm font-bold ${meta.title}">
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${meta.color}"></span>
-          ${escapeHtmlPublic(c.code)}
-        </div>
-        <div class="text-[15px] leading-relaxed text-slate-700">${escapeHtmlPublic(c.description || 'Fără descriere')}</div>
-      </div>`;
+    const m = codeMeta(c.code);
+    return `<div class="rounded-xl border p-3 ${m.box}">
+      <div class="mb-1 flex items-center gap-2 text-sm font-bold ${m.title}">
+        <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${m.color}"></span>
+        ${escapeHtmlPublic(c.code)}
+      </div>
+      <div class="text-[15px] leading-relaxed text-slate-700">${escapeHtmlPublic(c.description||'Fără descriere')}</div>
+    </div>`;
   }).join('')}</div>`;
 }
 
@@ -64,53 +58,47 @@ function warningCardHtml(item, index, isSelected) {
   return `
     <article class="mb-3 cursor-pointer rounded-xl border p-4 outline-none transition hover:border-brand-200 hover:bg-white ${cls}"
              data-warning="${index}" onclick="selectWarning(${index})">
-      <h3 class="text-base font-bold text-brand-700">${escapeHtmlPublic(item.phenomenon || 'Avertizare meteorologică')}</h3>
-      <p class="mt-1 text-[11px] text-slate-500">${escapeHtmlPublic(formatInterval(item) || formatDateTime(item.emitDate))}</p>
+      <h3 class="text-base font-bold text-brand-700">${escapeHtmlPublic(item.phenomenon||'Avertizare meteorologică')}</h3>
+      <p class="mt-1 text-[11px] text-slate-500">${escapeHtmlPublic(formatInterval(item)||formatDateTime(item.emitDate))}</p>
       ${codesHtml(item.codes)}
     </article>`;
 }
 
-function renderPopupToggleButton() {
+function renderPopupToggleButton(count) {
   const btn = document.getElementById('open-popup-btn');
   if (!btn) return;
-  const hasWarnings = getWarnings().length > 0;
-  btn.disabled    = !hasWarnings;
-  btn.textContent = hasWarnings ? 'Deschide popup' : 'Nu există avertizări';
+  btn.disabled    = count === 0;
+  btn.textContent = count > 0 ? 'Deschide popup' : 'Nu există avertizări';
 }
 
-function renderPhenomenaPanel() {
+function renderPhenomenaPanel(data) {
   const panel = document.getElementById('phenomena-panel');
-  const data  = getWarnings();
-  renderPopupToggleButton();
+  renderPopupToggleButton(data.length);
   if (!data.length) { panel.innerHTML = ''; return; }
-  panel.innerHTML = data
-    .map((item, index) => warningCardHtml(item, index, selectedWarningIndex === index))
-    .join('');
+  panel.innerHTML = data.map((item, i) => warningCardHtml(item, i, selectedWarningIndex === i)).join('');
 }
 
 // ── Popup ─────────────────────────────────────────────────────────────────────
 function alertBlockHtml(item, index) {
   const img = item.mapImage
     ? `<img src="${item.mapImage}" alt="Harta">`
-    : `<div class="flex items-center justify-center rounded-xl bg-slate-50 py-12 text-center text-sm text-slate-400" style="min-height:180px">Fără hartă</div>`;
+    : `<div style="min-height:180px" class="flex items-center justify-center rounded-xl bg-slate-50 py-12 text-center text-sm text-slate-400">Fără hartă</div>`;
 
-  const codeBadges = (item.codes || []).map(c => {
-    const meta = codeMeta(c.code);
-    const textColor = meta.color === '#FFED00' ? '#78350f' : '#fff';
+  const badges = (item.codes||[]).map(c => {
+    const m = codeMeta(c.code);
     return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                  style="background:${meta.color};color:${textColor}">${escapeHtmlPublic(c.code)}</span>`;
+                  style="background:${m.color};color:${m.color==='#FFED00'?'#78350f':'#fff'}">${escapeHtmlPublic(c.code)}</span>`;
   }).join('');
 
-  const codesFooterRows = (item.codes || []).map(c => {
-    const meta = codeMeta(c.code);
-    return `
-      <div class="flex items-start gap-3 rounded-xl border p-3 ${meta.box}">
-        <span class="mt-0.5 h-3 w-3 shrink-0 rounded-full" style="background:${meta.color}"></span>
-        <div class="min-w-0">
-          <div class="text-xs font-bold ${meta.title}">${escapeHtmlPublic(c.code)}</div>
-          <div class="mt-0.5 text-sm leading-relaxed text-slate-700">${escapeHtmlPublic(c.description || 'Fără descriere')}</div>
-        </div>
-      </div>`;
+  const footer = (item.codes||[]).map(c => {
+    const m = codeMeta(c.code);
+    return `<div class="flex items-start gap-3 rounded-xl border p-3 ${m.box}">
+      <span class="mt-0.5 h-3 w-3 shrink-0 rounded-full" style="background:${m.color}"></span>
+      <div class="min-w-0">
+        <div class="text-xs font-bold ${m.title}">${escapeHtmlPublic(c.code)}</div>
+        <div class="mt-0.5 text-sm leading-relaxed text-slate-700">${escapeHtmlPublic(c.description||'Fără descriere')}</div>
+      </div>
+    </div>`;
   }).join('');
 
   return `
@@ -118,42 +106,35 @@ function alertBlockHtml(item, index) {
       <div class="alert-content flex items-stretch gap-5">
         <div class="popup-map w-[30%] min-w-[160px] max-w-[280px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">${img}</div>
         <div class="flex min-w-0 flex-1 flex-col justify-center">
-          <h3 class="mb-2 text-lg font-extrabold text-slate-900">${escapeHtmlPublic(item.phenomenon || 'Avertizare meteorologică')}</h3>
+          <h3 class="mb-2 text-lg font-extrabold text-slate-900">${escapeHtmlPublic(item.phenomenon||'Avertizare')}</h3>
           <div class="mb-1 flex flex-wrap gap-1 text-sm">
             <span class="text-slate-500">Data emiterii:</span>
-            <span class="font-semibold text-slate-900">${escapeHtmlPublic(formatDateTime(item.emitDate) || '—')}</span>
+            <span class="font-semibold text-slate-900">${escapeHtmlPublic(formatDateTime(item.emitDate)||'—')}</span>
           </div>
           <div class="mb-3 flex flex-wrap gap-1 text-sm">
             <span class="text-slate-500">Intervalul de acțiune:</span>
-            <span class="font-semibold text-slate-900">${escapeHtmlPublic(formatInterval(item) || '—')}</span>
+            <span class="font-semibold text-slate-900">${escapeHtmlPublic(formatInterval(item)||'—')}</span>
           </div>
-          <div class="flex flex-wrap gap-2">${codeBadges}</div>
+          <div class="flex flex-wrap gap-2">${badges}</div>
         </div>
       </div>
-      ${codesFooterRows ? `<div class="mt-4 grid gap-2 sm:grid-cols-2">${codesFooterRows}</div>` : ''}
+      ${footer ? `<div class="mt-4 grid gap-2 sm:grid-cols-2">${footer}</div>` : ''}
     </section>`;
 }
 
-function showStartupPopups(force = false) {
-  const data    = getWarnings();
+function showStartupPopups(data, force = false) {
   const list    = document.getElementById('popup-list');
   const overlay = document.getElementById('overlay');
-  renderPopupToggleButton();
-
-  if (!data.length) {
-    overlay.classList.add('hidden');
-    overlay.classList.remove('flex');
-    return;
-  }
+  renderPopupToggleButton(data.length);
+  if (!data.length) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); return; }
   if (!force && sessionStorage.getItem(POPUP_DISMISSED_KEY) === POPUP_INSTANCE_ID) return;
-
-  list.innerHTML = data.map((item, index) => alertBlockHtml(item, index)).join('');
+  list.innerHTML = data.map((item, i) => alertBlockHtml(item, i)).join('');
   overlay.classList.remove('hidden');
   overlay.classList.add('flex');
 }
 
 function openPopup(index) {
-  showStartupPopups(true);
+  showStartupPopups(cachedWarnings, true);
   if (typeof index === 'number') {
     const block = document.getElementById('alert-' + index);
     if (block) block.scrollIntoView({ block: 'nearest' });
@@ -162,22 +143,15 @@ function openPopup(index) {
 
 function closePopup(e, { persistDismissal = true } = {}) {
   if (e && e.target?.id !== 'overlay') return;
-  const overlay = document.getElementById('overlay');
-  overlay.classList.add('hidden');
-  overlay.classList.remove('flex');
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('overlay').classList.remove('flex');
   if (persistDismissal) sessionStorage.setItem(POPUP_DISMISSED_KEY, POPUP_INSTANCE_ID);
 }
 
 // ── Map ───────────────────────────────────────────────────────────────────────
-function layerKeys(layer) {
-  return {
-    name:  layer.feature.properties.shapeName || layer.feature.properties.NAME || layer.feature.properties.name,
-    label: layer.feature.properties._label,
-  };
-}
-
 function restoreLayer(layer) {
-  const { name, label } = layerKeys(layer);
+  const name  = layer.feature.properties.shapeName || layer.feature.properties.NAME || layer.feature.properties.name;
+  const label = layer.feature.properties._label;
   const found = districtWarnings[name] || districtWarnings[label];
   if (found?.color) {
     layer.setStyle({ fillColor: found.color, fillOpacity: 0.9, color: '#ffffff', weight: 1.3 });
@@ -186,34 +160,30 @@ function restoreLayer(layer) {
   }
 }
 
-function applyMapColors() {
+function applyMapColors(data) {
   if (!publicGeojsonLayer) return;
-  const warnings = getWarnings();
-  const source   = selectedWarningIndex == null
-    ? warnings.map((warning, index) => ({ warning, index }))
-    : warnings[selectedWarningIndex]
-      ? [{ warning: warnings[selectedWarningIndex], index: selectedWarningIndex }]
-      : [];
+  const source = selectedWarningIndex == null
+    ? data.map((w, i) => ({ warning: w, index: i }))
+    : data[selectedWarningIndex] ? [{ warning: data[selectedWarningIndex], index: selectedWarningIndex }] : [];
 
   const result = {};
   source.forEach(({ warning, index }) => {
-    (warning.districts || []).forEach(district => {
-      [district.name, district.label].filter(Boolean).forEach(key => {
-        const current = result[key];
-        if (!current || colorRank(district.color) > colorRank(current.color)) {
-          result[key] = { color: district.color, warningIndex: index, warning };
+    (warning.districts || []).forEach(d => {
+      [d.name, d.label].filter(Boolean).forEach(key => {
+        if (!result[key] || colorRank(d.color) > colorRank(result[key].color)) {
+          result[key] = { color: d.color, warningIndex: index };
         }
       });
     });
   });
   districtWarnings = result;
   publicGeojsonLayer.eachLayer(restoreLayer);
-  renderPhenomenaPanel();
+  renderPhenomenaPanel(data);
 }
 
 function selectWarning(index) {
   selectedWarningIndex = index;
-  applyMapColors();
+  applyMapColors(cachedWarnings);
 }
 
 function initPublicMap() {
@@ -225,81 +195,69 @@ function initPublicMap() {
 
   fetch('/data/MD_MAP.geojson')
     .then(r => r.json())
-    .then(data => {
-      publicGeojsonLayer = L.geoJSON(data, {
+    .then(geo => {
+      publicGeojsonLayer = L.geoJSON(geo, {
         style: { color: '#ffffff', weight: 1.3, fillColor: PUBLIC_MAP_NORMAL_COLOR, fillOpacity: 0.9 },
         onEachFeature: (feature, layer) => {
-          const fullName = feature.properties.shapeName ||
-                           feature.properties.NAME ||
-                           feature.properties.name || '???';
-          const label = districtLabel(fullName);
+          const fullName = feature.properties.shapeName || feature.properties.NAME || feature.properties.name || '???';
+          const label    = districtLabel(fullName);
           layer.feature.properties._label = label;
           layer.bindTooltip(label, { permanent: true, direction: 'center', className: 'district-label' });
 
           layer.on({
-            mouseover: e => {
-              e.target.setStyle({ weight: 3, color: '#0f172a', fillOpacity: 0.98 });
-              e.target.bringToFront();
-            },
-            mouseout: e => restoreLayer(e.target),
-            click:    () => {
-              const found = districtWarnings[fullName] || districtWarnings[label];
+            mouseover: e => { e.target.setStyle({ weight: 3, color: '#0f172a', fillOpacity: 0.98 }); e.target.bringToFront(); },
+            mouseout:  e => restoreLayer(e.target),
+            click:     () => {
+              const name  = feature.properties.shapeName || feature.properties.NAME || feature.properties.name;
+              const label = feature.properties._label;
+              const found = districtWarnings[name] || districtWarnings[label];
               if (found) selectWarning(found.warningIndex);
             },
           });
         },
       }).addTo(publicMap);
 
-      function fitMapToCountry() {
+      function fitMap() {
         if (!publicMap || !publicGeojsonLayer) return;
         const el = publicMap.getContainer();
         if (!el.clientWidth || !el.clientHeight) return;
         publicMap.invalidateSize({ animate: false });
-        publicMap.fitBounds(publicGeojsonLayer.getBounds(), {
-          paddingTopLeft: [4, 12], paddingBottomRight: [440, 12],
-          animate: false, maxZoom: 20,
-        });
+        publicMap.fitBounds(publicGeojsonLayer.getBounds(), { paddingTopLeft: [4,12], paddingBottomRight: [440,12], animate: false, maxZoom: 20 });
       }
+      fitMap();
+      requestAnimationFrame(fitMap);
+      setTimeout(fitMap, 50);
+      setTimeout(fitMap, 250);
+      window.addEventListener('resize', fitMap);
+      if (window.ResizeObserver) new ResizeObserver(fitMap).observe(document.getElementById('map'));
 
-      fitMapToCountry();
-      requestAnimationFrame(fitMapToCountry);
-      setTimeout(fitMapToCountry, 50);
-      setTimeout(fitMapToCountry, 250);
-      window.addEventListener('resize', fitMapToCountry);
-      if (window.ResizeObserver) {
-        new ResizeObserver(fitMapToCountry).observe(document.getElementById('map'));
-      }
-      applyMapColors();
+      refreshData();
     })
     .catch(err => console.error('Map load error:', err));
 }
 
-// ── Expiry check ──────────────────────────────────────────────────────────────
-let publicExpiryTimer = null;
+// ── Data refresh ──────────────────────────────────────────────────────────────
+let publicRefreshTimer = null;
 
-function schedulePublicExpiryCheck() {
-  clearTimeout(publicExpiryTimer);
-  if (removeExpiredWarnings()) {
-    closePopup(null, { persistDismissal: false });
-    applyMapColors();
-    renderPhenomenaPanel();
-  }
-  const data  = getWarnings();
+async function refreshData(showPopup = false) {
+  const data = await getWarnings();
+  cachedWarnings = data;
+  applyMapColors(data);
+  if (showPopup) showStartupPopups(data);
+
   const now   = Date.now();
   const nexts = data.map(getExpiryTime).filter(t => t && t > now).sort((a, b) => a - b);
   const delay = nexts.length ? Math.min(nexts[0] - now + 50, 30000) : 30000;
-  publicExpiryTimer = setTimeout(schedulePublicExpiryCheck, Math.max(50, delay));
+  clearTimeout(publicRefreshTimer);
+  publicRefreshTimer = setTimeout(() => refreshData(false), Math.max(50, delay));
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 initPublicMap();
-schedulePublicExpiryCheck();
-renderPhenomenaPanel();
-renderPopupToggleButton();
-showStartupPopups();
 
-window.addEventListener('storage', () => {
-  schedulePublicExpiryCheck();
-  applyMapColors();
-  renderPhenomenaPanel();
+window.addEventListener('load', async () => {
+  const data = await getWarnings();
+  cachedWarnings = data;
+  renderPhenomenaPanel(data);
+  showStartupPopups(data);
 });

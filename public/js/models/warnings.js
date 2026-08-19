@@ -1,62 +1,55 @@
 /**
  * Model: warnings
- * Handles all localStorage CRUD and expiry logic for weather warnings.
+ * All warning CRUD goes through the Laravel API (/api/warnings).
+ * formatDateTime and formatInterval are shared utilities used by both
+ * admin and public controllers.
  */
 
-const STORAGE_KEY = 'moldova_weather_warnings';
+// ── API helpers ───────────────────────────────────────────────────────────────
 
-function getWarnings() {
-  return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+async function getWarnings() {
+  const res = await fetch('/api/warnings');
+  if (!res.ok) return [];
+  return res.json();
 }
 
-function saveWarnings(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-function addWarning(payload) {
-  const data = getWarnings();
-  data.unshift(payload);
-  saveWarnings(data);
-}
-
-function deleteWarning(targetId) {
-  const data = getWarnings().filter((item, index) => getWarningId(item, index) !== targetId);
-  saveWarnings(data);
-}
-
-function clearWarnings() {
-  localStorage.removeItem(STORAGE_KEY);
-}
-
-function getWarningId(item, index) {
-  return item.id || item.createdAt || String(index);
-}
-
-function getExpiryTime(item) {
-  const value = item.intervalTo ||
-    (item.interval && item.interval.includes('T') ? item.interval : null);
-  if (!value) return null;
-  const time = new Date(value).getTime();
-  return Number.isNaN(time) ? null : time;
-}
-
-function removeExpiredWarnings() {
-  const data = getWarnings();
-  const now = Date.now();
-  const next = data.filter(item => {
-    const expiry = getExpiryTime(item);
-    return expiry === null || expiry > now;
+async function addWarning(payload) {
+  const res = await fetch('/api/warnings', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    body:    JSON.stringify(payload),
   });
-  if (next.length !== data.length) {
-    saveWarnings(next);
-    return true;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Eroare la salvare');
   }
-  return false;
+  return res.json();
 }
+
+async function deleteWarning(id) {
+  const res = await fetch(`/api/warnings/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  if (!res.ok) throw new Error('Eroare la ștergere');
+}
+
+async function clearWarnings() {
+  const res = await fetch('/api/warnings', {
+    method: 'DELETE',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  if (!res.ok) throw new Error('Eroare la ștergere');
+}
+
+function getWarningId(item) {
+  return item.id ?? '';
+}
+
+// ── Date formatters ───────────────────────────────────────────────────────────
 
 function formatDateTime(value) {
   if (!value) return '';
-  if (!value.includes('T')) return value;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   const day   = String(d.getDate()).padStart(2, '0');
@@ -71,6 +64,11 @@ function formatInterval(item) {
   if (item.intervalFrom && item.intervalTo) {
     return `${formatDateTime(item.intervalFrom)} – ${formatDateTime(item.intervalTo)}`;
   }
-  if (item.interval && item.interval.includes('T')) return formatDateTime(item.interval);
   return item.interval || '';
+}
+
+function getExpiryTime(item) {
+  if (!item.intervalTo) return null;
+  const t = new Date(item.intervalTo).getTime();
+  return Number.isNaN(t) ? null : t;
 }

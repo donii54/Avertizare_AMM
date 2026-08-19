@@ -7,6 +7,7 @@
  */
 
 const NORMAL_COLOR = '#28D762';
+
 const PHENOMENA = [
   'Obaje (descărcări electrice)',
   'Vînt puternic și vijelie în rafale',
@@ -44,8 +45,7 @@ const districtData = {};
 // ── View transitions ──────────────────────────────────────────────────────────
 function showList() {
   document.body.classList.remove('editor-mode');
-  scheduleExpiryCheck();
-  renderSavedWarnings();
+  loadAndRenderWarnings();
 }
 
 function showEditor() {
@@ -55,6 +55,12 @@ function showEditor() {
     initAdminMap();
     refreshMapSize();
   });
+}
+
+// ── Warning list ──────────────────────────────────────────────────────────────
+async function loadAndRenderWarnings() {
+  const data = await getWarnings();
+  renderSavedWarnings(data);
 }
 
 // ── Editor form ───────────────────────────────────────────────────────────────
@@ -103,23 +109,14 @@ function updateSendButton() {
 function addCodeBlock(preferredCode = null) {
   const container = document.getElementById('codes-container');
   const existing  = Array.from(container.querySelectorAll('.code-block'));
+  if (existing.length >= 3) { alert('Poți adăuga maximum 3 coduri'); return; }
 
-  if (existing.length >= 3) {
-    alert('Poți adăuga maximum 3 coduri');
-    return;
-  }
-
-  const usedCodes = existing.map(block => block.querySelector('select').value);
-  let codeToAdd   = preferredCode;
-
+  const usedCodes = existing.map(b => b.querySelector('select').value);
+  let codeToAdd = preferredCode;
   if (!codeToAdd || usedCodes.includes(codeToAdd) || !CODE_ORDER.includes(codeToAdd)) {
-    codeToAdd = CODE_ORDER.find(code => !usedCodes.includes(code));
+    codeToAdd = CODE_ORDER.find(c => !usedCodes.includes(c));
   }
-
-  if (!codeToAdd) {
-    alert('Toate codurile au fost deja adăugate');
-    return;
-  }
+  if (!codeToAdd) { alert('Toate codurile au fost deja adăugate'); return; }
 
   container.appendChild(renderCodeBlock(codeToAdd));
   sortCodeBlocks();
@@ -127,20 +124,14 @@ function addCodeBlock(preferredCode = null) {
 }
 
 function onCodeChange(select) {
-  const newCode  = select.value;
-  const block    = select.closest('.code-block');
+  const newCode = select.value;
+  const block   = select.closest('.code-block');
   const container = document.getElementById('codes-container');
-
   const alreadyUsed = Array.from(container.querySelectorAll('.code-block'))
     .filter(b => b !== block)
     .some(b => b.querySelector('select').value === newCode);
 
-  if (alreadyUsed) {
-    alert('Acest cod este deja folosit');
-    select.value = block.dataset.code;
-    return;
-  }
-
+  if (alreadyUsed) { alert('Acest cod este deja folosit'); select.value = block.dataset.code; return; }
   block.dataset.code = newCode;
   block.querySelector('.code-dot').style.background = CODE_COLORS[newCode];
   sortCodeBlocks();
@@ -156,25 +147,19 @@ function sortCodeBlocks() {
   const container = document.getElementById('codes-container');
   const blocks    = Array.from(container.querySelectorAll('.code-block'));
   blocks
-    .sort((a, b) =>
-      CODE_ORDER.indexOf(a.querySelector('select').value) -
-      CODE_ORDER.indexOf(b.querySelector('select').value))
-    .forEach(block => container.appendChild(block));
+    .sort((a, b) => CODE_ORDER.indexOf(a.querySelector('select').value) - CODE_ORDER.indexOf(b.querySelector('select').value))
+    .forEach(b => container.appendChild(b));
 }
 
 // ── Map ───────────────────────────────────────────────────────────────────────
 function getId(feature) {
-  return feature.properties.shapeID ||
-         feature.properties.shapeName ||
-         Math.random().toString(36).slice(2);
+  return feature.properties.shapeID || feature.properties.shapeName || Math.random().toString(36).slice(2);
 }
 
 function refreshMapSize() {
   if (!adminMap) return;
   adminMap.invalidateSize(true);
-  if (geojsonLayer) {
-    adminMap.fitBounds(geojsonLayer.getBounds(), { padding: [15, 15] });
-  }
+  if (geojsonLayer) adminMap.fitBounds(geojsonLayer.getBounds(), { padding: [15, 15] });
 }
 
 function setDistrictColor(layer, color) {
@@ -188,33 +173,26 @@ function setDistrictColor(layer, color) {
     updateCount();
     return;
   }
-
   layer.setStyle({ fillColor: color, fillOpacity: 0.85, weight: 1.5, color: '#334155' });
   districtData[id] = { name: fullName, label, color };
   updateCount();
 }
 
 function paintDistrict(layer, toggle) {
-  if (currentColor === NORMAL_COLOR) {
-    setDistrictColor(layer, NORMAL_COLOR);
-    return;
-  }
+  if (currentColor === NORMAL_COLOR) { setDistrictColor(layer, NORMAL_COLOR); return; }
   const id = getId(layer.feature);
-  if (toggle && districtData[id] && districtData[id].color === currentColor) {
-    setDistrictColor(layer, NORMAL_COLOR);
-    return;
-  }
+  if (toggle && districtData[id]?.color === currentColor) { setDistrictColor(layer, NORMAL_COLOR); return; }
   setDistrictColor(layer, currentColor);
 }
 
 function paintAllDistricts() {
   if (!geojsonLayer) return;
-  geojsonLayer.eachLayer(layer => setDistrictColor(layer, currentColor));
+  geojsonLayer.eachLayer(l => setDistrictColor(l, currentColor));
   if (typeof geojsonLayer.redraw === 'function') geojsonLayer.redraw();
 }
 
 function resetMapColors() {
-  Object.keys(districtData).forEach(key => delete districtData[key]);
+  Object.keys(districtData).forEach(k => delete districtData[k]);
   if (geojsonLayer) geojsonLayer.eachLayer(l => geojsonLayer.resetStyle(l));
   updateCount();
 }
@@ -237,7 +215,6 @@ function initAdminMap() {
     keyboard: false, attributionControl: false, preferCanvas: true,
   });
 
-  // Color picker buttons
   document.querySelectorAll('.color-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
@@ -252,61 +229,43 @@ function initAdminMap() {
       geojsonLayer = L.geoJSON(data, {
         style: { color: '#f2f7f7', weight: 1.2, fillColor: NORMAL_COLOR, fillOpacity: 0.85 },
         onEachFeature: (feature, layer) => {
-          const fullName = feature.properties.shapeName ||
-                           feature.properties.NAME ||
-                           feature.properties.name || '???';
-          const label = districtLabel(fullName);
+          const fullName = feature.properties.shapeName || feature.properties.NAME || feature.properties.name || '???';
+          const label    = districtLabel(fullName);
           layer.feature.properties._name  = fullName;
           layer.feature.properties._label = label;
-
           layer.bindTooltip(label, { permanent: true, direction: 'center', className: 'district-label' });
 
           layer.on({
             mouseover(e) {
               geojsonLayer.eachLayer(l => {
                 const id = getId(l.feature);
-                if (districtData[id]) {
-                  l.setStyle({ fillColor: districtData[id].color, fillOpacity: 0.85, weight: 1.2, color: '#64748b' });
-                } else {
-                  geojsonLayer.resetStyle(l);
-                }
+                districtData[id]
+                  ? l.setStyle({ fillColor: districtData[id].color, fillOpacity: 0.85, weight: 1.2, color: '#64748b' })
+                  : geojsonLayer.resetStyle(l);
               });
               e.target.setStyle({ weight: 3, color: '#0f172a', fillOpacity: 0.95 });
               e.target.bringToFront();
             },
             mouseout(e) {
               const id = getId(feature);
-              if (districtData[id]) {
-                e.target.setStyle({ fillColor: districtData[id].color, fillOpacity: 0.85, weight: 1.2, color: '#64748b' });
-              } else {
-                geojsonLayer.resetStyle(e.target);
-              }
+              districtData[id]
+                ? e.target.setStyle({ fillColor: districtData[id].color, fillOpacity: 0.85, weight: 1.2, color: '#64748b' })
+                : geojsonLayer.resetStyle(e.target);
             },
-            click(e) {
-              if (e.originalEvent?.shiftKey) { L.DomEvent.stop(e); paintDistrict(e.target, false); }
-            },
-            dblclick(e) {
-              if (!e.originalEvent?.shiftKey) { L.DomEvent.stop(e); paintDistrict(e.target, true); }
-            },
+            click(e)    { if (e.originalEvent?.shiftKey)  { L.DomEvent.stop(e); paintDistrict(e.target, false); } },
+            dblclick(e) { if (!e.originalEvent?.shiftKey) { L.DomEvent.stop(e); paintDistrict(e.target, true);  } },
           });
         },
       }).addTo(adminMap);
-
       setTimeout(refreshMapSize, 50);
     })
-    .catch(err => {
-      alert('Nu s-a putut încărca harta. Verifică conexiunea.');
-      console.error(err);
-    });
+    .catch(err => { alert('Nu s-a putut încărca harta.'); console.error(err); });
 }
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 function validatePaintedCodes(codes) {
   const districts    = paintedDistricts();
-  const codeColorSet = codes
-    .map(code => CODE_COLORS[code])
-    .filter(c => c && c !== NORMAL_COLOR);
-
+  const codeColorSet = codes.map(c => CODE_COLORS[c]).filter(Boolean);
   if (!districts.length || !districts.some(d => codeColorSet.includes(d.color))) {
     alert('Colorează cel puțin un raion cu culoarea codului selectat');
     return false;
@@ -324,68 +283,66 @@ async function sendToServer() {
 
   const codes = [];
   document.querySelectorAll('.code-block').forEach(block => {
-    codes.push({
-      code:        block.querySelector('select').value,
-      description: block.querySelector('textarea').value.trim(),
-    });
+    codes.push({ code: block.querySelector('select').value, description: block.querySelector('textarea').value.trim() });
   });
 
   if (!validatePaintedCodes(codes.map(c => c.code))) return;
 
-  const payload = {
-    id:          Date.now().toString(),
-    emitDate, phenomenon, intervalFrom, intervalTo,
-    interval:    `${intervalFrom} – ${intervalTo}`,
-    codes,
-    districts:   paintedDistricts(),
-    createdAt:   new Date().toISOString(),
-  };
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Se trimite...';
 
   try {
     adminMap.invalidateSize(true);
     await new Promise(r => setTimeout(r, 400));
 
     const canvas = await html2canvas(document.getElementById('map'), {
-      useCORS: true, allowTaint: true,
-      backgroundColor: '#f0f4f8', scale: 2, logging: false, removeContainer: true,
+      useCORS: true, allowTaint: true, backgroundColor: '#f0f4f8', scale: 2, logging: false, removeContainer: true,
     });
-    payload.mapImage = canvas.toDataURL('image/png');
 
-    addWarning(payload);
+    await addWarning({
+      phenomenon, emitDate, intervalFrom, intervalTo,
+      codes, districts: paintedDistricts(),
+      mapImage: canvas.toDataURL('image/png'),
+    });
+
     alert('Trimis!');
     showList();
   } catch (err) {
     console.error(err);
-    alert('Eroare la capturarea hărții: ' + err.message);
+    alert('Eroare: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Trimite pe server';
+    updateSendButton();
   }
 }
 
-// ── Warning CRUD wrappers (called from HTML onclick) ─────────────────────────
-function onDeleteWarning(event, id) {
+// ── Warning CRUD ──────────────────────────────────────────────────────────────
+async function onDeleteWarning(event, id) {
   event.stopPropagation();
   if (!confirm('Stergere avertizare?')) return;
-  deleteWarning(id);
+  await deleteWarning(id);
   closeAdminPopup();
-  renderSavedWarnings();
+  loadAndRenderWarnings();
 }
 
-function clearAllWarnings() {
-  if (!getWarnings().length) return;
+async function clearAllWarnings() {
+  const data = await getWarnings();
+  if (!data.length) return;
   if (!confirm('Șterge toate avertizările?')) return;
-  clearWarnings();
-  renderSavedWarnings();
+  await clearWarnings();
+  loadAndRenderWarnings();
 }
 
 // ── Expiry check ──────────────────────────────────────────────────────────────
 let expiryTimer = null;
 
-function scheduleExpiryCheck() {
+async function scheduleExpiryCheck() {
   clearTimeout(expiryTimer);
-  if (removeExpiredWarnings()) {
-    closeAdminPopup();
-    renderSavedWarnings();
-  }
-  const data  = getWarnings();
+  const data  = await getWarnings();
+  renderSavedWarnings(data);
+
   const now   = Date.now();
   const nexts = data.map(getExpiryTime).filter(t => t && t > now).sort((a, b) => a - b);
   const delay = nexts.length ? Math.min(nexts[0] - now + 50, 30000) : 30000;
@@ -393,13 +350,13 @@ function scheduleExpiryCheck() {
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
-function startAdmin() {
+async function startAdmin() {
   document.body.classList.add('logged-in');
   initAdminMap();
-  scheduleExpiryCheck();
-  renderSavedWarnings();
+  await loadAndRenderWarnings();
   fillTimeSelects();
   fillPhenomena();
+  scheduleExpiryCheck();
 
   document.getElementById('phenomenon').addEventListener('change', updateSendButton);
   document.getElementById('cal-hour').addEventListener('change', commitCalendarValue);
@@ -411,20 +368,11 @@ function startAdmin() {
     if (pop.contains(event.target) || event.target.closest('.date-trigger')) return;
     closeCalendar(true);
   });
-
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') closeCalendar(true);
-  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeCalendar(true); });
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
   const authed = await checkAuth();
   if (!authed) { window.location.href = '/login.html'; return; }
   startAdmin();
-});
-
-window.addEventListener('storage', async () => {
-  if (!await checkAuth()) return;
-  scheduleExpiryCheck();
-  renderSavedWarnings();
 });

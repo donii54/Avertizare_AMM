@@ -39,18 +39,17 @@ function formatWarningDate(emitDate) {
   return formatDateTime(emitDate).replace(/, ora.*/, '');
 }
 
-function renderSavedWarnings() {
+function renderSavedWarnings(data = []) {
   const list = document.getElementById('saved-list');
   if (!list) return;
 
-  const data = getWarnings();
   if (data.length === 0) {
     list.innerHTML = `<div class="empty">Nu există avertizări</div>`;
     return;
   }
 
   list.innerHTML = data.map((item, index) => {
-    const id      = getWarningId(item, index);
+    const id      = getWarningId(item);
     const mainCode = item.codes?.[0]?.code || 'COD GALBEN';
     const date    = formatWarningDate(item.emitDate);
     const interval = formatInterval(item);
