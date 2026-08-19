@@ -14,24 +14,7 @@
 </head>
 <body>
 
-  <section id="login-view">
-    <form class="login-card" onsubmit="handleLogin(event)">
-      <h1>Administrare</h1>
-      <p>Avertizări Meteorologice</p>
-      <label>
-        Login
-        <input type="text" id="login-user" autocomplete="username" required>
-      </label>
-      <label>
-        Parolă
-        <input type="password" id="login-pass" autocomplete="current-password" required>
-      </label>
-      <div id="login-error" class="login-error"></div>
-      <button type="submit" class="btn login-submit">Intră</button>
-    </form>
-  </section>
-
-  <section id="list-view">
+  <section id="list-view" style="display:block">
     <div class="admin-header">
       <h1>Avertizări Meteorologice</h1>
       <button class="logout-btn" onclick="handleLogout()">Ieșire</button>
