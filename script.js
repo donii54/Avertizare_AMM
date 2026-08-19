@@ -1,28 +1,16 @@
 // ========== НАСТРОЙКИ ==========
-const API_URL = 'https://твой-сервер.com/api/weather'; // ← поменяй на свой адрес
 const STORAGE_KEY = 'moldova_weather_warnings';
 const AUTH_KEY = 'moldova_admin_auth';
 const ADMIN_LOGIN = 'admin';
 const ADMIN_PASSWORD = 'admin';
 
-// Короткие коды районов
-const shortCodes = {
-  "Briceni": "BR", "Ocnița": "OC", "Ocniţa": "OC", "Edineț": "ED", "Edineţ": "ED",
-  "Dondușeni": "DN", "Donduşeni": "DN", "Drochia": "DR", "Rîșcani": "RS", "Rîşcani": "RS",
-  "Glodeni": "GL", "Fălești": "FL", "Făleşti": "FL", "Sîngerei": "SG", "Sîngerei": "SG",
-  "Florești": "FR", "Floreşti": "FR", "Șoldănești": "SD", "Şoldăneşti": "SD",
-  "Soroca": "SR", "Rezina": "RZ", "Telenești": "TL", "Teleneşti": "TL", "Orhei": "OR",
-  "Ungheni": "UN", "Călărași": "CL", "Călăraşi": "CL", "Nisporeni": "NS",
-  "Strășeni": "ST", "Străşeni": "ST", "Criuleni": "CR", "Dubăsari": "DB",
-  "Anenii Noi": "AN", "Ialoveni": "IL", "Hîncești": "HN", "Hînceşti": "HN",
-  "Cimișlia": "CM", "Cimişlia": "CM", "Leova": "LV", "Căușeni": "CS", "Căuşeni": "CS",
-  "Ștefan Vodă": "SV", "Ştefan Vodă": "SV", "Cantemir": "CT", "Cahul": "CH",
-  "Taraclia": "TR", "Basarabeasca": "BS",
-  "Chișinău": "CHIȘINĂU", "Chişinău": "CHIȘINĂU",
-  "Bălți": "Bălți", "Bălţi": "Bălți",
-  "Gagauzia": "UTAG", "Găgăuzia": "UTAG", "Unitatea Teritorială Autonomă Găgăuzia": "UTAG",
-  "Comrat": "UTAG", "Tiraspol": "Tiraspol", "Bender": "Bender", "Tighina": "Bender"
-};
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 const codeColors = {
   'COD GALBEN': '#FFED00',
@@ -147,7 +135,7 @@ function initMap() {
                              feature.properties.NAME ||
                              feature.properties.name || '???';
 
-            const label = shortCodes[fullName] || fullName;
+            const label = districtLabel(fullName);
             layer.feature.properties._name = fullName;
             layer.feature.properties._label = label;
 
@@ -475,7 +463,7 @@ async function sendToServer() {
     showList();
   } catch (err) {
     console.error(err);
-    alert('Ошибка скриншота: ' + err.message);
+    alert('Eroare la capturarea hărții: ' + err.message);
   }
 }
 
@@ -583,7 +571,7 @@ function renderSavedWarnings() {
 
   const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   if (data.length === 0) {
-    list.innerHTML = `<div class="empty">Nu esti avertizari</div>`;
+    list.innerHTML = `<div class="empty">Nu există avertizări</div>`;
     return;
   }
 
@@ -591,7 +579,7 @@ function renderSavedWarnings() {
     const id = getWarningId(item, index);
     const mainCode = item.codes?.[0]?.code || 'COD GALBEN';
     const badges = (item.codes || []).map(c => {
-      return `<span class="badge" style="background:${codeColor(c.code)}">${c.code}</span>`;
+      return `<span class="badge" style="background:${codeColor(c.code)}">${escapeHtml(c.code)}</span>`;
     }).join('');
 
     const date = formatWarningDate(item.emitDate);
@@ -601,8 +589,8 @@ function renderSavedWarnings() {
     return `
       <div class="card ${codeBorderClass(mainCode)}" onclick="openPopup(${index})">
         <div>
-          <div class="card-title">${item.phenomenon || 'Avertizare meteorologică'}</div>
-          <div class="card-meta">${meta}</div>
+          <div class="card-title">${escapeHtml(item.phenomenon || 'Avertizare meteorologică')}</div>
+          <div class="card-meta">${escapeHtml(meta)}</div>
         </div>
         <div class="card-codes">
           ${badges}
@@ -633,7 +621,7 @@ function openPopup(index) {
           <div class="dot" style="background:${color}"></div>
           ${c.code}
         </div>
-        <div class="code-desc">${c.description || ''}</div>
+        <div class="code-desc">${escapeHtml(c.description || '')}</div>
       </div>
     `;
   }).join('');

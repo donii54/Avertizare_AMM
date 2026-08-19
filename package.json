@@ -1,0 +1,10 @@
+{
+  "name": "avertizare-amm",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}

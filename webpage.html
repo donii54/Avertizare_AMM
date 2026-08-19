@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       corePlugins: { preflight: false },
@@ -30,8 +31,8 @@
       }
     };
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="district-codes.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; }
@@ -150,24 +151,16 @@
 
   <script>
     const STORAGE_KEY = 'moldova_weather_warnings';
+    const POPUP_DISMISSED_KEY = 'moldova_warnings_popup_dismissed';
     const NORMAL_COLOR = '#28D762';
-    const shortCodes = {
-      "Briceni": "BR", "Ocnița": "OC", "Ocniţa": "OC", "Edineț": "ED", "Edineţ": "ED",
-      "Dondușeni": "DN", "Donduşeni": "DN", "Drochia": "DR", "Rîșcani": "RS", "Rîşcani": "RS",
-      "Glodeni": "GL", "Fălești": "FL", "Făleşti": "FL", "Sîngerei": "SG", "Sîngerei": "SG",
-      "Florești": "FR", "Floreşti": "FR", "Șoldănești": "SD", "Şoldăneşti": "SD",
-      "Soroca": "SR", "Rezina": "RZ", "Telenești": "TL", "Teleneşti": "TL", "Orhei": "OR",
-      "Ungheni": "UN", "Călărași": "CL", "Călăraşi": "CL", "Nisporeni": "NS",
-      "Strășeni": "ST", "Străşeni": "ST", "Criuleni": "CR", "Dubăsari": "DB",
-      "Anenii Noi": "AN", "Ialoveni": "IL", "Hîncești": "HN", "Hînceşti": "HN",
-      "Cimișlia": "CM", "Cimişlia": "CM", "Leova": "LV", "Căușeni": "CS", "Căuşeni": "CS",
-      "Ștefan Vodă": "SV", "Ştefan Vodă": "SV", "Cantemir": "CT", "Cahul": "CH",
-      "Taraclia": "TR", "Basarabeasca": "BS",
-      "Chișinău": "CHIȘINĂU", "Chişinău": "CHIȘINĂU",
-      "Bălți": "Bălți", "Bălţi": "Bălți",
-      "Gagauzia": "UTAG", "Găgăuzia": "UTAG", "Unitatea Teritorială Autonomă Găgăuzia": "UTAG",
-      "Comrat": "UTAG", "Tiraspol": "Tiraspol", "Bender": "Bender", "Tighina": "Bender"
-    };
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
 
     let map = null;
     let geojsonLayer = null;
@@ -247,9 +240,9 @@
               <div class="rounded-xl border p-3 ${meta.box}">
                 <div class="mb-1 flex items-center gap-2 text-sm font-bold ${meta.title}">
                   <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:${meta.color}"></span>
-                  ${c.code}
+                  ${escapeHtml(c.code)}
                 </div>
-                <div class="text-[15px] leading-relaxed text-slate-700">${c.description || 'Fără descriere'}</div>
+                <div class="text-[15px] leading-relaxed text-slate-700">${escapeHtml(c.description || 'Fără descriere')}</div>
               </div>
             `;
           }).join('')}
@@ -260,8 +253,8 @@
     function warningCardHtml(item, index) {
       return `
         <article class="mb-3 cursor-pointer rounded-xl border border-slate-200 bg-white p-4 outline-none transition hover:border-brand-200" data-warning="${index}" onclick="selectWarning(${index})">
-          <h3 class="text-base font-bold text-brand-700">${item.phenomenon || 'Avertizare meteorologică'}</h3>
-          <p class="mt-1 text-[11px] text-slate-500">${formatInterval(item) || formatDateTime(item.emitDate)}</p>
+          <h3 class="text-base font-bold text-brand-700">${escapeHtml(item.phenomenon || 'Avertizare meteorologică')}</h3>
+          <p class="mt-1 text-[11px] text-slate-500">${escapeHtml(formatInterval(item) || formatDateTime(item.emitDate))}</p>
           ${codesHtml(item.codes)}
         </article>
       `;
@@ -308,9 +301,9 @@
             <div class="popup-map min-h-[360px] w-[38%] min-w-[280px] max-w-[460px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2">${img}</div>
             <div class="flex min-w-0 flex-1 flex-col rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <h3 class="mb-3 text-2xl font-extrabold text-slate-900">AVERTIZARE</h3>
-              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Data emiterii:</span> <span class="font-bold text-slate-900">${formatDateTime(item.emitDate) || '—'}</span></div>
-              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Fenomene:</span> <span class="font-bold text-slate-900">${item.phenomenon || '—'}</span></div>
-              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Intervalul de acțiune:</span> <span class="font-bold text-slate-900">${formatInterval(item) || '—'}</span></div>
+              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Data emiterii:</span> <span class="font-bold text-slate-900">${escapeHtml(formatDateTime(item.emitDate) || '—')}</span></div>
+              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Fenomene:</span> <span class="font-bold text-slate-900">${escapeHtml(item.phenomenon || '—')}</span></div>
+              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Intervalul de acțiune:</span> <span class="font-bold text-slate-900">${escapeHtml(formatInterval(item) || '—')}</span></div>
               ${codesHtml(item.codes)}
             </div>
           </div>
@@ -402,7 +395,7 @@
               const fullName = feature.properties.shapeName ||
                                feature.properties.NAME ||
                                feature.properties.name || '???';
-              const label = shortCodes[fullName] || fullName;
+              const label = districtLabel(fullName);
               layer.feature.properties._label = label;
               layer.bindTooltip(label, {
                 permanent: true,
@@ -456,18 +449,30 @@
         .catch(err => console.error(err));
     }
 
-    function showStartupPopups() {
+    function warningsFingerprint(data) {
+      return data.map((item) => item.id || item.createdAt).join('|');
+    }
+
+    function showStartupPopups(force = false) {
       const data = getWarnings();
       const list = document.getElementById('popup-list');
       const overlay = document.getElementById('overlay');
-      if (!data.length) return;
+      if (!data.length) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        return;
+      }
+      const fingerprint = warningsFingerprint(data);
+      if (!force && sessionStorage.getItem(POPUP_DISMISSED_KEY) === fingerprint) {
+        return;
+      }
       list.innerHTML = data.map((item, index) => alertBlockHtml(item, index)).join('');
       overlay.classList.remove('hidden');
       overlay.classList.add('flex');
     }
 
     function openPopup(index) {
-      showStartupPopups();
+      showStartupPopups(true);
       const block = document.getElementById('alert-' + index);
       if (block) block.scrollIntoView({ block: 'nearest' });
     }
@@ -477,6 +482,7 @@
       const overlay = document.getElementById('overlay');
       overlay.classList.add('hidden');
       overlay.classList.remove('flex');
+      sessionStorage.setItem(POPUP_DISMISSED_KEY, warningsFingerprint(getWarnings()));
     }
 
     let expiryTimer = null;
@@ -485,7 +491,7 @@
       if (removeExpiredWarnings()) {
         closePopup();
         applyMapColors();
-        showStartupPopups();
+        renderPhenomenaPanel();
       }
       const data = getWarnings();
       const now = Date.now();
@@ -497,7 +503,7 @@
     window.addEventListener('storage', () => {
       scheduleExpiryCheck();
       applyMapColors();
-      showStartupPopups();
+      renderPhenomenaPanel();
     });
 
     initMap();
