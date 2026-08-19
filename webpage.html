@@ -140,12 +140,26 @@
 
   <div id="toast-stack" class="pointer-events-none fixed right-5 top-5 z-[1100] flex w-[min(340px,calc(100vw-32px))] flex-col gap-3"></div>
 
-  <div id="overlay" class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-900/50 p-4" onclick="closePopup(event)">
-    <div class="relative max-h-[92vh] w-full max-w-6xl overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl" onclick="event.stopPropagation()">
-      <div class="sticky top-0 z-10 flex justify-end bg-white px-4 pt-3">
-        <button class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-lg leading-none text-slate-700 hover:bg-slate-200" onclick="closePopup()" aria-label="Închide">×</button>
+  <div id="overlay" class="fixed inset-0 z-[1000] hidden items-center justify-center bg-slate-900/60 p-4" onclick="closePopup(event)">
+    <div class="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onclick="event.stopPropagation()">
+      <!-- ONE header for all warnings -->
+      <div class="flex shrink-0 items-center gap-3 border-b border-slate-100 bg-white px-6 py-4">
+        <svg class="h-6 w-6 shrink-0" viewBox="0 0 24 24" fill="#FFED00" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.2 2.4 20.4h19.2L12 3.2z"/><path d="M12 9.2v5.4" stroke="#111827" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1" fill="#111827"/></svg>
+        <span class="flex-1 text-base font-extrabold tracking-wide text-red-600 uppercase">Avertizare Meteorologică</span>
+        <button class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-lg leading-none text-slate-700 hover:bg-slate-200" onclick="closePopup()" aria-label="Închide">×</button>
       </div>
-      <div class="px-6 pb-6" id="popup-list"></div>
+      <!-- scrollable list of warnings -->
+      <div class="min-h-0 flex-1 overflow-y-auto" id="popup-list"></div>
+      <!-- ONE footer legend -->
+      <div class="shrink-0 border-t border-slate-100 bg-slate-50 px-6 py-3" id="popup-footer">
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs font-bold text-slate-600">
+          <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full" style="background:#FF0000"></span>COD ROȘU</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full" style="background:#FF8A00"></span>COD PORTOCALIU</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full" style="background:#FFED00;border:1px solid #d4a900"></span>COD GALBEN</span>
+          <span class="flex items-center gap-1.5"><span class="inline-block h-3 w-3 rounded-full" style="background:#28D762"></span>FĂRĂ COD</span>
+        </div>
+        <p class="mt-1.5 text-[11px] italic text-slate-400">Notă: Informația are caracter informativ. În cazul pericolului iminent se vor emite avertizări actualizate.</p>
+      </div>
     </div>
   </div>
 
@@ -274,40 +288,48 @@
       }
     }
 
-    function warningIcon() {
-      return `<svg class="h-5 w-5" viewBox="0 0 24 24" fill="#FFED00" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.2 2.4 20.4h19.2L12 3.2z"/><path d="M12 9.2v5.4" stroke="#111827" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.8" r="1" fill="#111827"/></svg>`;
-    }
-
-    function legendHtml() {
-      return `
-        <div class="mt-4 flex flex-wrap gap-3 text-xs font-bold text-slate-600">
-          <span>🔴 ROȘU</span>
-          <span>🟠 PORTOCALIU</span>
-          <span>🟡 GALBEN</span>
-          <span>🟢 VERDE</span>
-        </div>
-        <p class="mt-2 text-[11px] italic leading-relaxed text-slate-400">Notă: Informația are caracter informativ. În cazul pericolului iminent se vor emite avertizări actualizate.</p>
-      `;
-    }
-
     function alertBlockHtml(item, index) {
       const img = item.mapImage
-        ? `<img src="${item.mapImage}" alt="Harta" class="rounded-xl bg-slate-50">`
-        : `<div class="flex flex-1 items-center justify-center px-3 py-10 text-center text-sm text-slate-400">Fără hartă</div>`;
+        ? `<img src="${item.mapImage}" alt="Harta" class="h-full w-full rounded-xl object-contain bg-slate-50">`
+        : `<div class="flex h-full w-full items-center justify-center rounded-xl bg-slate-50 py-12 text-center text-sm text-slate-400">Fără hartă</div>`;
+
+      const codeBadges = (item.codes || []).map(c => {
+        const meta = codeMeta(c.code);
+        return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold" style="background:${meta.color};color:${meta.color === '#FFED00' ? '#78350f' : '#fff'}">${escapeHtml(c.code)}</span>`;
+      }).join('');
+
+      const codesFooterRows = (item.codes || []).map(c => {
+        const meta = codeMeta(c.code);
+        return `
+          <div class="flex items-start gap-3 rounded-xl border p-3 ${meta.box}">
+            <span class="mt-0.5 h-3 w-3 shrink-0 rounded-full" style="background:${meta.color}"></span>
+            <div class="min-w-0">
+              <div class="text-xs font-bold ${meta.title}">${escapeHtml(c.code)}</div>
+              <div class="mt-0.5 text-sm leading-relaxed text-slate-700">${escapeHtml(c.description || 'Fără descriere')}</div>
+            </div>
+          </div>`;
+      }).join('');
+
       return `
-        <section class="mb-4 cursor-pointer border-b border-slate-100 pb-5 last:mb-0 last:border-b-0 last:pb-0" id="alert-${index}" onclick="selectWarning(${index})">
-          <div class="mb-3 flex items-center gap-2 text-sm font-extrabold tracking-wide text-red-600">${warningIcon()} AVERTIZĂRI METEOROLOGICE</div>
+        <section class="border-b border-slate-100 px-6 py-5 last:border-b-0" id="alert-${index}">
+          <!-- map + meta row -->
           <div class="alert-content flex items-stretch gap-5">
-            <div class="popup-map min-h-[360px] w-[38%] min-w-[280px] max-w-[460px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2">${img}</div>
-            <div class="flex min-w-0 flex-1 flex-col rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <h3 class="mb-3 text-2xl font-extrabold text-slate-900">AVERTIZARE</h3>
-              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Data emiterii:</span> <span class="font-bold text-slate-900">${escapeHtml(formatDateTime(item.emitDate) || '—')}</span></div>
-              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Fenomene:</span> <span class="font-bold text-slate-900">${escapeHtml(item.phenomenon || '—')}</span></div>
-              <div class="mb-1.5 flex flex-wrap gap-1.5 text-sm"><span class="text-slate-500">Intervalul de acțiune:</span> <span class="font-bold text-slate-900">${escapeHtml(formatInterval(item) || '—')}</span></div>
-              ${codesHtml(item.codes)}
+            <div class="popup-map min-h-[260px] w-[42%] min-w-[220px] max-w-[420px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2" style="max-height:340px">${img}</div>
+            <div class="flex min-w-0 flex-1 flex-col justify-center">
+              <h3 class="mb-2 text-lg font-extrabold text-slate-900">${escapeHtml(item.phenomenon || 'Avertizare meteorologică')}</h3>
+              <div class="mb-1 flex flex-wrap gap-1 text-sm">
+                <span class="text-slate-500">Data emiterii:</span>
+                <span class="font-semibold text-slate-900">${escapeHtml(formatDateTime(item.emitDate) || '—')}</span>
+              </div>
+              <div class="mb-3 flex flex-wrap gap-1 text-sm">
+                <span class="text-slate-500">Intervalul de acțiune:</span>
+                <span class="font-semibold text-slate-900">${escapeHtml(formatInterval(item) || '—')}</span>
+              </div>
+              <div class="flex flex-wrap gap-2">${codeBadges}</div>
             </div>
           </div>
-          ${legendHtml()}
+          <!-- codes detail footer for this warning -->
+          ${codesFooterRows ? `<div class="mt-4 grid gap-2 sm:grid-cols-2">${codesFooterRows}</div>` : ''}
         </section>
       `;
     }
