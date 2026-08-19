@@ -87,11 +87,13 @@
     }
     .popup-map img {
       position: absolute;
-      inset: 8px;
-      width: calc(100% - 16px);
-      height: calc(100% - 16px);
-      object-fit: contain;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
       object-position: center;
+      display: block;
+      background: transparent;
     }
     @media (max-width: 900px) {
       html, body { overflow: auto; }
@@ -171,6 +173,9 @@
   <script>
     const STORAGE_KEY = 'moldova_weather_warnings';
     const POPUP_DISMISSED_KEY = 'moldova_warnings_popup_dismissed';
+    // Auto-open popup on page reload; keep it closed after the user dismisses it
+    // until the next reload (expiration-driven changes must not "re-arm" auto-open).
+    const POPUP_INSTANCE_ID = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const NORMAL_COLOR = '#28D762';
 
     function escapeHtml(value) {
@@ -328,8 +333,8 @@
       return `
         <section class="border-b border-slate-100 px-6 py-5 last:border-b-0" id="alert-${index}">
           <!-- map + meta row -->
-          <div class="alert-content flex items-stretch gap-5">
-            <div class="popup-map min-h-[260px] w-[42%] min-w-[220px] max-w-[420px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2" style="max-height:340px">${img}</div>
+            <div class="alert-content flex items-stretch gap-5">
+            <div class="popup-map min-h-[260px] w-[42%] min-w-[220px] max-w-[420px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-0" style="max-height:340px">${img}</div>
             <div class="flex min-w-0 flex-1 flex-col justify-center">
               <h3 class="mb-2 text-lg font-extrabold text-slate-900">${escapeHtml(item.phenomenon || 'Avertizare meteorologică')}</h3>
               <div class="mb-1 flex flex-wrap gap-1 text-sm">
@@ -500,8 +505,7 @@
         overlay.classList.remove('flex');
         return;
       }
-      const fingerprint = warningsFingerprint(data);
-      if (!force && sessionStorage.getItem(POPUP_DISMISSED_KEY) === fingerprint) {
+      if (!force && sessionStorage.getItem(POPUP_DISMISSED_KEY) === POPUP_INSTANCE_ID) {
         return;
       }
       list.innerHTML = data.map((item, index) => alertBlockHtml(item, index)).join('');
@@ -517,19 +521,21 @@
       }
     }
 
-    function closePopup(e) {
+    function closePopup(e, { persistDismissal = true } = {}) {
       if (e && e.target && e.target.id !== 'overlay') return;
       const overlay = document.getElementById('overlay');
       overlay.classList.add('hidden');
       overlay.classList.remove('flex');
-      sessionStorage.setItem(POPUP_DISMISSED_KEY, warningsFingerprint(getWarnings()));
+      if (persistDismissal) {
+        sessionStorage.setItem(POPUP_DISMISSED_KEY, POPUP_INSTANCE_ID);
+      }
     }
 
     let expiryTimer = null;
     function scheduleExpiryCheck() {
       clearTimeout(expiryTimer);
       if (removeExpiredWarnings()) {
-        closePopup();
+        closePopup(null, { persistDismissal: false });
         applyMapColors();
         renderPhenomenaPanel();
       }

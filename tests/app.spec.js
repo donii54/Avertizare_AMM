@@ -89,7 +89,7 @@ test('district labels use short codes from GeoJSON names', async ({ page }) => {
   expect(labels.some((t) => t === 'Calarasi')).toBe(false);
 });
 
-test('popup stays dismissed after reload in same session', async ({ page }) => {
+test('popup auto-opens after reload', async ({ page }) => {
   const warning = {
     id: 'popup-test',
     emitDate: '2026-08-19T10:00',
@@ -113,5 +113,5 @@ test('popup stays dismissed after reload in same session', async ({ page }) => {
   await expect(overlay).toHaveClass(/hidden/);
 
   await page.reload();
-  await expect(overlay).toHaveClass(/hidden/);
+  await expect(overlay).toHaveClass(/flex/);
 });
