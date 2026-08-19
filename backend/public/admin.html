@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <title>Avertizări Meteorologice — Administrare</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- Tailwind must load before tailwind.config -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { corePlugins: { preflight: false } };</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Admin list ─────────────────────────────────────────────────────── -->
+  <section id="list-view" style="display:block">
+    <div class="admin-header">
+      <h1>Avertizări Meteorologice</h1>
+      <button class="logout-btn" onclick="handleLogout()">Ieșire</button>
+    </div>
+
+    <div class="list" id="saved-list">
+      <div class="empty">Nu există avertismente deocamdată</div>
+    </div>
+
+    <button class="btn btn-create" onclick="showEditor()">Adaugă avertizare</button>
+    <button class="clear-btn" onclick="clearAllWarnings()">Șterge totul</button>
+  </section>
+
+  <!-- ── Warning editor ────────────────────────────────────────────────── -->
+  <section id="editor-view">
+    <div id="map"></div>
+
+    <div class="panel">
+      <div>
+        <button class="btn-back" onclick="showList()">← Înapoi</button>
+        <h1>AVERTIZARE</h1>
+      </div>
+
+      <div class="field">
+        <label>Data emiterii</label>
+        <input type="hidden" id="emitDate" required>
+        <button type="button" id="emitDate-trigger" class="date-trigger" onclick="openCalendar('emitDate')">
+          <svg class="date-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+            <path d="M3 9h18M8 3v4M16 3v4"></path>
+          </svg>
+          <span id="emitDate-label">Alege data și ora</span>
+        </button>
+      </div>
+
+      <div class="field">
+        <label>Fenomene</label>
+        <select id="phenomenon" required>
+          <option value="">Alege fenomenul</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Intervalul de acțiune</label>
+        <div class="interval-fields">
+          <div>
+            <label for="intervalFrom-trigger">De la</label>
+            <input type="hidden" id="intervalFrom" required>
+            <button type="button" id="intervalFrom-trigger" class="date-trigger" onclick="openCalendar('intervalFrom')">
+              <svg class="date-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                <path d="M3 9h18M8 3v4M16 3v4"></path>
+              </svg>
+              <span id="intervalFrom-label">Alege data și ora</span>
+            </button>
+          </div>
+          <div>
+            <label for="intervalTo-trigger">Până la</label>
+            <input type="hidden" id="intervalTo" required>
+            <button type="button" id="intervalTo-trigger" class="date-trigger" onclick="openCalendar('intervalTo')">
+              <svg class="date-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                <path d="M3 9h18M8 3v4M16 3v4"></path>
+              </svg>
+              <span id="intervalTo-label">Alege data și ora</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="color-label">Culoare pentru umplerea raioanelor</label>
+        <div class="colors">
+          <div class="color-btn green"  data-color="#28D762" title="Normă — resetează culoarea"></div>
+          <div class="color-btn yellow active" data-color="#FFED00"></div>
+          <div class="color-btn orange" data-color="#FF8A00"></div>
+          <div class="color-btn red"    data-color="#FF0000"></div>
+        </div>
+        <button type="button" class="btn-paint-all" onclick="paintAllDistricts()">Colorează toată harta</button>
+        <div class="paint-hint">Dublu-click pentru a colora un raion. Shift + click pentru mai multe raioane.</div>
+      </div>
+
+      <div id="codes-container"></div>
+      <button class="btn-add" onclick="addCodeBlock()">Adaugă cod</button>
+
+      <div class="btn-row">
+        <button class="btn btn-send" id="send-btn" onclick="sendToServer()" disabled>Trimite pe server</button>
+        <button class="btn btn-reset" onclick="resetMapColors()">Resetează</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Warning detail popup ──────────────────────────────────────────── -->
+  <div class="overlay" id="overlay" onclick="closeAdminPopup(event)">
+    <div class="popup" onclick="event.stopPropagation()">
+      <div class="popup-header">
+        <h2>⚠️ AVERTIZĂRI METEOROLOGICE</h2>
+        <button class="close-btn" onclick="closeAdminPopup()">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="popup-map">
+          <img id="popup-img" src="" alt="Harta">
+        </div>
+        <div class="popup-info">
+          <h3>AVERTIZARE</h3>
+          <div class="info-row"><span class="label">Data emiterii:</span>      <span class="value" id="p-date"></span></div>
+          <div class="info-row"><span class="label">Fenomene:</span>           <span class="value" id="p-phenomenon"></span></div>
+          <div class="info-row"><span class="label">Intervalul de acțiune:</span> <span class="value" id="p-interval"></span></div>
+          <div id="p-codes"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Calendar popover ──────────────────────────────────────────────── -->
+  <div id="calendar-popover" class="hidden fixed z-[80] w-[340px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15">
+    <div class="mb-3 flex items-center justify-between">
+      <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" onclick="shiftCalendarMonth(-1)" aria-label="Luna anterioară">‹</button>
+      <div class="text-sm font-semibold text-slate-800" id="calendar-title"></div>
+      <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" onclick="shiftCalendarMonth(1)" aria-label="Luna următoare">›</button>
+    </div>
+    <div class="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <span>Lu</span><span>Ma</span><span>Mi</span><span>Jo</span><span>Vi</span><span>Sâ</span><span>Du</span>
+    </div>
+    <div id="calendar-days" class="grid grid-cols-7 gap-1"></div>
+    <div class="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+      <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Ora</span>
+      <div class="flex items-center gap-2">
+        <select id="cal-hour" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-800"></select>
+        <span class="font-semibold text-slate-400">:</span>
+        <select id="cal-minute" class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-semibold text-slate-800"></select>
+      </div>
+    </div>
+    <div class="mt-3 flex gap-2">
+      <button type="button" class="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200" onclick="setCalendarToday()">Astăzi</button>
+      <button type="button" class="flex-1 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onclick="closeCalendar(true)">Gata</button>
+    </div>
+  </div>
+
+  <!-- ── Scripts (MVC load order: model → view → controller) ──────────── -->
+  <script src="/js/district-codes.js"></script>
+  <script src="/js/models/warnings.js"></script>
+  <script src="/js/models/auth.js"></script>
+  <script src="/js/views/calendar-view.js"></script>
+  <script src="/js/views/admin-view.js"></script>
+  <script src="/js/controllers/admin.js"></script>
+</body>
+</html>

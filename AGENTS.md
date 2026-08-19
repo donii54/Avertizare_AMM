@@ -2,33 +2,86 @@
 
 ## Cursor Cloud specific instructions
 
-This repository is a **static** meteorological warning app for Moldova (HTML/CSS/JS + Leaflet). There is no package manager, build step, or backend server in the repo.
+This repository is a meteorological warning app for Moldova with two backends:
 
-### Running the app
+| Backend | Stack | Port | Entry |
+|---|---|---|---|
+| **Laravel (current)** | PHP 8.3 + SQLite | 8000 | `backend/` |
+| Node.js (legacy) | Express + JWT cookies | 8080 | `server/app.js` |
 
-A local HTTP server is required because `MD_MAP.geojson` is loaded via `fetch()` (opening files directly with `file://` will fail).
-
-The Cloud Agent environment starts a static server automatically via `.cursor/environment.json` terminals:
-
-- **Admin panel:** http://localhost:8080/index.html (login `admin` / `admin`)
-- **Public map:** http://localhost:8080/webpage.html
-
-To start manually in a shell:
+### Running the Laravel backend (recommended)
 
 ```bash
-python3 -m http.server 8080 --bind 0.0.0.0
+cd backend
+php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-### Testing a core flow
+- **Public map:** http://localhost:8000/
+- **Login:** http://localhost:8000/login.html  (`admin` / `admin`)
+- **Admin panel:** http://localhost:8000/admin  (protected, requires login)
 
-1. Open the admin panel and log in with `admin` / `admin`.
-2. Click **Adaugă avertizare**, fill dates/phenomenon, click districts on the map to paint warning colors, then save.
-3. Open the public page to verify the warning appears on the map (data is stored in browser `localStorage` under key `moldova_weather_warnings`).
+### First-time setup (backend/)
+
+```bash
+cd backend
+cp .env.example .env.example  # already configured for SQLite
+php artisan migrate --seed     # creates DB + seeds admin user
+php artisan serve --host=0.0.0.0 --port=8000
+```
+
+### Changing admin password
+
+Edit `backend/.env`:
+
+```
+ADMIN_USER=admin
+ADMIN_PASSWORD=МойНовыйПароль
+```
+
+Then re-seed: `php artisan db:seed --class=AdminUserSeeder`
+
+### Architecture
+
+```
+backend/                  Laravel 13 application
+  app/
+    Models/Warning.php    Eloquent model (SQLite)
+    Models/AdminUser.php
+    Http/Controllers/Api/
+      AuthController.php  POST /api/login, /api/logout, GET /api/me
+      WarningController.php GET/POST/DELETE /api/warnings
+    Http/Middleware/RequireAdminSession.php
+  database/migrations/    warnings + admin_users tables
+  database/database.sqlite SQLite data file
+  public/                 Static frontend (HTML/CSS/JS)
+    index.html            Public map (/)
+    admin.html            Admin panel (/admin)
+    login.html            Login page
+    js/
+      district-codes.js
+      models/warnings.js  Fetches from /api/warnings (no localStorage)
+      models/auth.js      checkAuth via /api/me
+      views/
+      controllers/
+
+public/                   Legacy static frontend (for Node.js backend)
+server/                   Legacy Node.js/Express backend
+```
+
+### Tests
+
+Playwright tests target the Node.js backend on port 8080:
+
+```bash
+npm test   # runs against http://localhost:8080
+```
+
+Laravel backend tests can be run with:
+
+```bash
+cd backend && php artisan test
+```
 
 ### External CDN dependencies
 
-The app loads Leaflet, Tailwind CSS, html2canvas, and Google Fonts from public CDNs at runtime. No install step is needed, but outbound network access must be available when testing in a browser.
-
-### Lint / tests
-
-There are no automated lint or test scripts in this repository.
+Leaflet, Tailwind CSS, html2canvas, Google Fonts — loaded from CDN at runtime. Outbound network access required in browser.
