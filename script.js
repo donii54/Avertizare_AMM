@@ -1,8 +1,5 @@
 // ========== НАСТРОЙКИ ==========
 const STORAGE_KEY = 'moldova_weather_warnings';
-const AUTH_KEY = 'moldova_admin_auth';
-const ADMIN_LOGIN = 'admin';
-const ADMIN_PASSWORD = 'admin';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -837,30 +834,18 @@ function setCalendarToday() {
   renderCalendar();
 }
 
-function isLoggedIn() {
-  return sessionStorage.getItem(AUTH_KEY) === '1';
-}
-
-function handleLogin(event) {
-  event.preventDefault();
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const error = document.getElementById('login-error');
-
-  if (user === ADMIN_LOGIN && pass === ADMIN_PASSWORD) {
-    sessionStorage.setItem(AUTH_KEY, '1');
-    error.textContent = '';
-    startAdmin();
-    return;
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/me');
+    return res.ok;
+  } catch {
+    return false;
   }
-
-  error.textContent = 'Login sau parolă incorectă';
 }
 
-function handleLogout() {
-  sessionStorage.removeItem(AUTH_KEY);
-  document.body.classList.remove('logged-in', 'editor-mode');
-  location.reload();
+async function handleLogout() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/login.html';
 }
 
 function startAdmin() {
@@ -887,11 +872,17 @@ function startAdmin() {
   });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  if (isLoggedIn()) startAdmin();
+window.addEventListener('DOMContentLoaded', async () => {
+  const authed = await checkAuth();
+  if (!authed) {
+    window.location.href = '/login.html';
+    return;
+  }
+  startAdmin();
 });
-window.addEventListener('storage', () => {
-  if (!isLoggedIn()) return;
+window.addEventListener('storage', async () => {
+  const authed = await checkAuth();
+  if (!authed) return;
   scheduleExpiryCheck();
   renderSavedWarnings();
 });

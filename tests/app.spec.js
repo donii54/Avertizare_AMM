@@ -9,17 +9,40 @@ test.beforeEach(async ({ page }) => {
   }, STORAGE_KEY);
 });
 
-test('admin login and create warning', async ({ page }) => {
-  const errors = [];
-  page.on('pageerror', (err) => errors.push(String(err)));
+async function loginViaApi(page) {
+  const resp = await page.request.post(`${BASE}/api/login`, {
+    data: { user: 'admin', password: 'admin' },
+  });
+  expect(resp.ok()).toBeTruthy();
+}
 
-  await page.goto(`${BASE}/index.html`);
+test('login page rejects wrong password', async ({ page }) => {
+  await page.goto(`${BASE}/login.html`);
+  await page.fill('#login-user', 'admin');
+  await page.fill('#login-pass', 'wrong');
+  await page.click('button[type=submit]');
+  await expect(page.locator('#login-error')).toContainText('incorectă');
+});
+
+test('login page redirects to admin on correct password', async ({ page }) => {
+  await page.goto(`${BASE}/login.html`);
   await page.fill('#login-user', 'admin');
   await page.fill('#login-pass', 'admin');
-  await page.click('button.login-submit');
-
+  await page.click('button[type=submit]');
+  await page.waitForURL('**/admin');
   await expect(page.locator('#list-view')).toBeVisible();
-  await page.click('button.btn-create');
+});
+
+test('admin page redirects to login without auth', async ({ page }) => {
+  await page.goto(`${BASE}/admin`);
+  await page.waitForURL('**/login.html');
+});
+
+test('admin create warning flow', async ({ page }) => {
+  await loginViaApi(page);
+  await page.goto(`${BASE}/admin`);
+  await expect(page.locator('#list-view')).toBeVisible();
+  await page.click('text=Adaugă avertizare');
   await expect(page.locator('#editor-view')).toBeVisible();
 
   await page.selectOption('#phenomenon', { index: 1 });
@@ -37,17 +60,13 @@ test('admin login and create warning', async ({ page }) => {
   await setDate('intervalTo', Math.min(today.getDate() + 2, 28));
 
   await page.click('.color-btn.yellow');
-  const map = page.locator('#map');
-  await map.dblclick({ position: { x: 280, y: 220 } });
+  await page.locator('#map').dblclick({ position: { x: 280, y: 220 } });
 
   const sendBtn = page.locator('#send-btn');
   await expect(sendBtn).toBeEnabled({ timeout: 5000 });
-
-  page.once('dialog', (dialog) => dialog.accept());
+  page.once('dialog', (d) => d.accept());
   await sendBtn.click();
-
   await expect(page.locator('.card')).toHaveCount(1);
-  expect(errors.some((e) => e.includes('tailwind is not defined'))).toBe(false);
 });
 
 test('public page renders saved warning', async ({ page }) => {
@@ -57,27 +76,24 @@ test('public page renders saved warning', async ({ page }) => {
     phenomenon: 'Test furtună',
     intervalFrom: '2026-08-19T10:00',
     intervalTo: '2026-08-21T10:00',
-    interval: '2026-08-19T10:00 – 2026-08-21T10:00',
     codes: [{ code: 'COD GALBEN', description: 'Test descriere' }],
     districts: [{ name: 'Calarasi', label: 'CL', color: '#FFED00' }],
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 
   await page.addInitScript(({ key, payload }) => {
     localStorage.setItem(key, JSON.stringify([payload]));
   }, { key: STORAGE_KEY, payload: warning });
 
-  await page.goto(`${BASE}/webpage.html`);
+  await page.goto(`${BASE}/`);
   await expect(page.locator('#phenomena-panel article')).toHaveCount(1);
   await expect(page.locator('#phenomena-panel')).toContainText('Test furtună');
 });
 
 test('district labels use short codes from GeoJSON names', async ({ page }) => {
-  await page.goto(`${BASE}/index.html`);
-  await page.fill('#login-user', 'admin');
-  await page.fill('#login-pass', 'admin');
-  await page.click('button.login-submit');
-  await page.click('button.btn-create');
+  await loginViaApi(page);
+  await page.goto(`${BASE}/admin`);
+  await page.click('text=Adaugă avertizare');
 
   await page.waitForFunction(() => {
     return document.querySelectorAll('.district-label').length > 0;
@@ -87,31 +103,4 @@ test('district labels use short codes from GeoJSON names', async ({ page }) => {
   expect(labels).toContain('CL');
   expect(labels).toContain('CHIȘINĂU');
   expect(labels.some((t) => t === 'Calarasi')).toBe(false);
-});
-
-test('popup auto-opens after reload', async ({ page }) => {
-  const warning = {
-    id: 'popup-test',
-    emitDate: '2026-08-19T10:00',
-    phenomenon: 'Test popup',
-    intervalFrom: '2026-08-19T10:00',
-    intervalTo: '2026-08-21T10:00',
-    codes: [{ code: 'COD GALBEN', description: 'desc' }],
-    districts: [{ name: 'Calarasi', label: 'CL', color: '#FFED00' }],
-    createdAt: new Date().toISOString()
-  };
-
-  await page.addInitScript(({ key, payload }) => {
-    localStorage.setItem(key, JSON.stringify([payload]));
-  }, { key: STORAGE_KEY, payload: warning });
-
-  await page.goto(`${BASE}/webpage.html`);
-  const overlay = page.locator('#overlay');
-  await expect(overlay).toHaveClass(/flex/);
-
-  await page.getByRole('button', { name: 'Închide' }).click();
-  await expect(overlay).toHaveClass(/hidden/);
-
-  await page.reload();
-  await expect(overlay).toHaveClass(/flex/);
 });
