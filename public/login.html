@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Autentificare — Administrare</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/css/style.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { corePlugins: { preflight: false } };</script>
 </head>
@@ -25,18 +25,27 @@
       <button type="submit" class="btn login-submit">Intră</button>
     </form>
   </section>
+
   <script>
+    // Redirect if already authenticated
+    (async () => {
+      try {
+        const res = await fetch('/api/me');
+        if ((await res.json()).ok) window.location.href = '/admin';
+      } catch {}
+    })();
+
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const user = document.getElementById('login-user').value.trim();
+      const user     = document.getElementById('login-user').value.trim();
       const password = document.getElementById('login-pass').value;
-      const error = document.getElementById('login-error');
+      const error    = document.getElementById('login-error');
 
       try {
-        const res = await fetch('/api/login', {
-          method: 'POST',
+        const res  = await fetch('/api/login', {
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user, password }),
+          body:    JSON.stringify({ user, password }),
         });
         const data = await res.json();
         if (data.ok) {
@@ -44,18 +53,10 @@
         } else {
           error.textContent = data.error || 'Login sau parolă incorectă';
         }
-      } catch (err) {
+      } catch {
         error.textContent = 'Eroare de conexiune';
       }
     });
-
-    (async () => {
-      try {
-        const res = await fetch('/api/me');
-        const data = await res.json();
-        if (data.ok) window.location.href = '/admin';
-      } catch {}
-    })();
   </script>
 </body>
 </html>

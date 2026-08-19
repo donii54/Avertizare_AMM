@@ -16,6 +16,8 @@ async function loginViaApi(page) {
   expect(resp.ok()).toBeTruthy();
 }
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
 test('login page rejects wrong password', async ({ page }) => {
   await page.goto(`${BASE}/login.html`);
   await page.fill('#login-user', 'admin');
@@ -24,7 +26,7 @@ test('login page rejects wrong password', async ({ page }) => {
   await expect(page.locator('#login-error')).toContainText('incorectă');
 });
 
-test('login page redirects to admin on correct password', async ({ page }) => {
+test('login page redirects to /admin on correct password', async ({ page }) => {
   await page.goto(`${BASE}/login.html`);
   await page.fill('#login-user', 'admin');
   await page.fill('#login-pass', 'admin');
@@ -33,12 +35,14 @@ test('login page redirects to admin on correct password', async ({ page }) => {
   await expect(page.locator('#list-view')).toBeVisible();
 });
 
-test('admin page redirects to login without auth', async ({ page }) => {
+test('/admin redirects to /login.html without auth cookie', async ({ page }) => {
   await page.goto(`${BASE}/admin`);
   await page.waitForURL('**/login.html');
 });
 
-test('admin create warning flow', async ({ page }) => {
+// ── Admin create warning ──────────────────────────────────────────────────────
+
+test('admin can create a warning', async ({ page }) => {
   await loginViaApi(page);
   await page.goto(`${BASE}/admin`);
   await expect(page.locator('#list-view')).toBeVisible();
@@ -69,6 +73,8 @@ test('admin create warning flow', async ({ page }) => {
   await expect(page.locator('.card')).toHaveCount(1);
 });
 
+// ── Public page ───────────────────────────────────────────────────────────────
+
 test('public page renders saved warning', async ({ page }) => {
   const warning = {
     id: 'test-warning',
@@ -80,7 +86,6 @@ test('public page renders saved warning', async ({ page }) => {
     districts: [{ name: 'Calarasi', label: 'CL', color: '#FFED00' }],
     createdAt: new Date().toISOString(),
   };
-
   await page.addInitScript(({ key, payload }) => {
     localStorage.setItem(key, JSON.stringify([payload]));
   }, { key: STORAGE_KEY, payload: warning });
@@ -90,17 +95,48 @@ test('public page renders saved warning', async ({ page }) => {
   await expect(page.locator('#phenomena-panel')).toContainText('Test furtună');
 });
 
-test('district labels use short codes from GeoJSON names', async ({ page }) => {
+// ── District labels ───────────────────────────────────────────────────────────
+
+test('map district labels use GeoJSON short codes', async ({ page }) => {
   await loginViaApi(page);
   await page.goto(`${BASE}/admin`);
   await page.click('text=Adaugă avertizare');
 
-  await page.waitForFunction(() => {
-    return document.querySelectorAll('.district-label').length > 0;
-  }, { timeout: 10000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll('.district-label').length > 0,
+    { timeout: 10000 }
+  );
 
   const labels = await page.locator('.district-label').allTextContents();
   expect(labels).toContain('CL');
   expect(labels).toContain('CHIȘINĂU');
   expect(labels.some((t) => t === 'Calarasi')).toBe(false);
+});
+
+// ── Popup auto-open ───────────────────────────────────────────────────────────
+
+test('public popup auto-opens on reload', async ({ page }) => {
+  const warning = {
+    id: 'popup-test',
+    emitDate: '2026-08-19T10:00',
+    phenomenon: 'Test popup',
+    intervalFrom: '2026-08-19T10:00',
+    intervalTo: '2026-08-21T10:00',
+    codes: [{ code: 'COD GALBEN', description: 'desc' }],
+    districts: [{ name: 'Calarasi', label: 'CL', color: '#FFED00' }],
+    createdAt: new Date().toISOString(),
+  };
+  await page.addInitScript(({ key, payload }) => {
+    localStorage.setItem(key, JSON.stringify([payload]));
+  }, { key: STORAGE_KEY, payload: warning });
+
+  await page.goto(`${BASE}/`);
+  const overlay = page.locator('#overlay');
+  await expect(overlay).toHaveClass(/flex/);
+
+  await page.getByRole('button', { name: 'Închide' }).click();
+  await expect(overlay).toHaveClass(/hidden/);
+
+  await page.reload();
+  await expect(overlay).toHaveClass(/flex/);
 });

@@ -2,7 +2,7 @@
   "name": "avertizare-amm",
   "private": true,
   "scripts": {
-    "start": "node server.js",
+    "start": "node server/app.js",
     "test": "playwright test"
   },
   "dependencies": {
