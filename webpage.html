@@ -82,18 +82,13 @@
       outline: none;
     }
     .popup-map {
-      position: relative;
-      align-self: stretch;
+      align-self: flex-start;
     }
     .popup-map img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
       display: block;
-      background: transparent;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
     }
     @media (max-width: 900px) {
       html, body { overflow: auto; }
@@ -310,8 +305,8 @@
 
     function alertBlockHtml(item, index) {
       const img = item.mapImage
-        ? `<img src="${item.mapImage}" alt="Harta" class="h-full w-full rounded-xl object-contain bg-slate-50">`
-        : `<div class="flex h-full w-full items-center justify-center rounded-xl bg-slate-50 py-12 text-center text-sm text-slate-400">Fără hartă</div>`;
+        ? `<img src="${item.mapImage}" alt="Harta">`
+        : `<div class="flex items-center justify-center rounded-xl bg-slate-50 py-12 text-center text-sm text-slate-400" style="min-height:180px">Fără hartă</div>`;
 
       const codeBadges = (item.codes || []).map(c => {
         const meta = codeMeta(c.code);
@@ -334,7 +329,7 @@
         <section class="border-b border-slate-100 px-6 py-5 last:border-b-0" id="alert-${index}">
           <!-- map + meta row -->
             <div class="alert-content flex items-stretch gap-5">
-            <div class="popup-map min-h-[260px] w-[42%] min-w-[220px] max-w-[420px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-0" style="max-height:340px">${img}</div>
+            <div class="popup-map w-[42%] min-w-[200px] max-w-[400px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">${img}</div>
             <div class="flex min-w-0 flex-1 flex-col justify-center">
               <h3 class="mb-2 text-lg font-extrabold text-slate-900">${escapeHtml(item.phenomenon || 'Avertizare meteorologică')}</h3>
               <div class="mb-1 flex flex-wrap gap-1 text-sm">
