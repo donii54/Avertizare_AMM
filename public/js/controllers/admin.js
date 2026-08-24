@@ -45,11 +45,17 @@ const districtData = {};
 // ── View transitions ──────────────────────────────────────────────────────────
 function showList() {
   document.body.classList.remove('editor-mode');
+  if (location.hash === '#editor') {
+    history.replaceState(null, '', '/admin');
+  }
   loadAndRenderWarnings();
 }
 
 function showEditor() {
   document.body.classList.add('editor-mode');
+  if (location.hash !== '#editor') {
+    history.replaceState(null, '', '/admin#editor');
+  }
   prepareEditorForm();
   requestAnimationFrame(() => {
     initAdminMap();

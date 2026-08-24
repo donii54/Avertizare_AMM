@@ -14,7 +14,8 @@ class AdminPagesTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('AVERTIZĂRI METEOROLOGICE', false);
+            ->assertSee('AVERTIZĂRI METEOROLOGICE', false)
+            ->assertSee('href="/login"', false);
     }
 
     public function test_login_page_is_accessible(): void
