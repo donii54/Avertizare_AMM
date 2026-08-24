@@ -14,7 +14,7 @@ class RequireAdminSession
             if ($request->expectsJson()) {
                 return response()->json(['ok' => false, 'error' => 'Nu ești autentificat'], 401);
             }
-            return redirect('/login.html');
+            return redirect('/login');
         }
 
         return $next($request);
