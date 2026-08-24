@@ -6,11 +6,14 @@ This is a **Laravel 13 + SQLite** meteorological warning application for Moldova
 
 ### Running the app
 
+First-time setup and the one-command start are documented in `README.md`.
+
 ```bash
-composer install
-php artisan migrate --seed   # creates SQLite DB + seeds admin user
-php artisan serve --host=0.0.0.0 --port=8000
+composer setup
+composer run dev
 ```
+
+`composer run dev` starts Laravel (`:8000`) and Vite (`:5173`) together via `php artisan dev`.
 
 - **Public map:** http://localhost:8000/  (no login)
 - **Login:** http://localhost:8000/login  (`admin` / `admin`)
