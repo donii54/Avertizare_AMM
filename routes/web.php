@@ -1,15 +1,22 @@
 <?php
 
+use App\Http\Middleware\RequireAdminSession;
 use Illuminate\Support\Facades\Route;
 
-// Public map
+// Public map — no authentication
 Route::get('/', function () {
-    return file_get_contents(public_path('index.html'));
+    return response(file_get_contents(public_path('index.html')))
+        ->header('Content-Type', 'text/html; charset=UTF-8');
 });
 
-// Admin panel — always serves admin.html.
-// Authentication is handled client-side: the page shows a login form
-// if the user is not authenticated (/api/me returns 401).
-Route::get('/admin', function () {
-    return file_get_contents(public_path('admin.html'));
+// Login page — after success the client opens the warning editor at /admin#editor
+Route::get('/login', function () {
+    return response(file_get_contents(public_path('login.html')))
+        ->header('Content-Type', 'text/html; charset=UTF-8');
 });
+
+// Warning editor (and saved-warning list). Guests are redirected to /login.
+Route::get('/admin', function () {
+    return response(file_get_contents(public_path('admin.html')))
+        ->header('Content-Type', 'text/html; charset=UTF-8');
+})->middleware(RequireAdminSession::class);

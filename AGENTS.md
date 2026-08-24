@@ -12,9 +12,9 @@ php artisan migrate --seed   # creates SQLite DB + seeds admin user
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-- **Public map:** http://localhost:8000/
-- **Login:** http://localhost:8000/login.html  (`admin` / `admin`)
-- **Admin:** http://localhost:8000/admin  (protected)
+- **Public map:** http://localhost:8000/  (no login)
+- **Login:** http://localhost:8000/login  (`admin` / `admin`)
+- **Editor:** after a successful login the browser opens `/admin#editor` (warning map editor). `/admin` without the hash shows the saved-warning list. Guests are redirected to `/login`.
 
 ### Changing admin password
 

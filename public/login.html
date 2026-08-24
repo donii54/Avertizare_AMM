@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Autentificare — Administrare</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <!-- Tailwind must load before tailwind.config -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { corePlugins: { preflight: false } };</script>
 </head>
@@ -27,11 +28,13 @@
   </section>
 
   <script>
-    // Redirect if already authenticated
+    const EDITOR_URL = '/admin#editor';
+
+    // Already authenticated → open the warning editor
     (async () => {
       try {
         const res = await fetch('/api/me');
-        if ((await res.json()).ok) window.location.href = '/admin';
+        if (res.ok && (await res.json()).ok) window.location.replace(EDITOR_URL);
       } catch {}
     })();
 
@@ -40,6 +43,7 @@
       const user     = document.getElementById('login-user').value.trim();
       const password = document.getElementById('login-pass').value;
       const error    = document.getElementById('login-error');
+      error.textContent = '';
 
       try {
         const res  = await fetch('/api/login', {
@@ -49,7 +53,7 @@
         });
         const data = await res.json();
         if (data.ok) {
-          window.location.href = '/admin';
+          window.location.href = EDITOR_URL;
         } else {
           error.textContent = data.error || 'Login sau parolă incorectă';
         }
