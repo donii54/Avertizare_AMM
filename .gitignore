@@ -9,8 +9,13 @@
 /storage/framework/sessions/*
 /storage/framework/views/*
 /storage/logs/*.log
+/storage/pail/
 /bootstrap/cache/config.php
 /bootstrap/cache/routes*.php
+/public/hot
+/public/build
+/public/storage
+/public/fonts-manifest.dev.json
 test-results/
 playwright-report/
 .phpunit.result.cache
