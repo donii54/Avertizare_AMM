@@ -294,25 +294,54 @@ body:not(.logged-in) #editor-view {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  background: #fff;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   color: #94a3b8;
   font-size: 14px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 39, 73, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .date-trigger:hover {
   border-color: #93c5fd;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(30, 75, 142, 0.08);
 }
 .date-trigger.has-value {
-  color: #1e293b;
+  color: #0f2749;
+  border-color: #c7d7ea;
+}
+.date-trigger-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #eef4fb;
+  color: #1e4b8e;
+  flex-shrink: 0;
 }
 .date-trigger-icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+}
+.date-trigger-label {
+  flex: 1;
+  min-width: 0;
+}
+.date-trigger-chevron {
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
   flex-shrink: 0;
-  color: #64748b;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.date-trigger:hover .date-trigger-chevron {
+  color: #1e4b8e;
 }
 
 .colors {
