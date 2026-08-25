@@ -109,15 +109,17 @@ function renderCalendar() {
     const btn = document.createElement('button');
     btn.type        = 'button';
     btn.textContent = date.getDate();
-    btn.className   = 'flex h-9 w-full items-center justify-center rounded-full border-0 bg-transparent text-sm font-medium outline-none transition';
+    // Do not put a default bg-* here: Tailwind CDN resolves conflicting
+    // utilities by stylesheet order, so bg-transparent would hide selected days.
+    btn.className   = 'flex h-9 w-full items-center justify-center rounded-full border-0 text-sm font-medium outline-none transition';
     if (!inMonth) {
-      btn.className += ' text-slate-300 hover:bg-slate-50';
+      btn.className += ' bg-transparent text-slate-300 hover:bg-slate-50';
     } else if (isSelected) {
       btn.className += ' bg-[#1E4B8E] font-semibold text-white shadow-sm shadow-[#1E4B8E]/35';
     } else if (isToday) {
       btn.className += ' bg-[#EEF4FB] font-semibold text-[#1E4B8E] hover:bg-[#D7E6F6]';
     } else {
-      btn.className += ' text-slate-700 hover:bg-slate-100';
+      btn.className += ' bg-transparent text-slate-700 hover:bg-slate-100';
     }
 
     btn.addEventListener('click', () => {
