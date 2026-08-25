@@ -71,11 +71,19 @@ function commitCalendarValue() {
   next.setHours(hour, minute, 0, 0);
   calendarState.selected = next;
   setDateField(calendarState.fieldId, toDateTimeValue(next));
+  updateSelectedLabel();
+}
+
+function updateSelectedLabel() {
+  const label = document.getElementById('calendar-selected-label');
+  if (!label || !calendarState.selected) return;
+  label.textContent = formatDateTime(toDateTimeValue(calendarState.selected));
 }
 
 function renderCalendar() {
   document.getElementById('calendar-title').textContent =
     `${CALENDAR_MONTHS[calendarState.viewMonth]} ${calendarState.viewYear}`;
+  updateSelectedLabel();
 
   const first      = new Date(calendarState.viewYear, calendarState.viewMonth, 1);
   const startOffset = (first.getDay() + 6) % 7;
@@ -101,11 +109,16 @@ function renderCalendar() {
     const btn = document.createElement('button');
     btn.type        = 'button';
     btn.textContent = date.getDate();
-    btn.className   = 'h-9 rounded-lg text-sm font-medium transition';
-    if (!inMonth)       btn.className += ' text-slate-300';
-    else if (isSelected) btn.className += ' bg-blue-600 text-white shadow-sm';
-    else if (isToday)   btn.className += ' bg-blue-50 font-semibold text-blue-700';
-    else                btn.className += ' text-slate-700 hover:bg-slate-100';
+    btn.className   = 'flex h-9 w-full items-center justify-center rounded-full text-sm font-medium transition';
+    if (!inMonth) {
+      btn.className += ' text-slate-300 hover:bg-slate-50';
+    } else if (isSelected) {
+      btn.className += ' bg-[#1E4B8E] font-semibold text-white shadow-sm shadow-[#1E4B8E]/35';
+    } else if (isToday) {
+      btn.className += ' bg-[#EEF4FB] font-semibold text-[#1E4B8E] ring-1 ring-[#1E4B8E]/25 hover:bg-[#D7E6F6]';
+    } else {
+      btn.className += ' text-slate-700 hover:bg-slate-100';
+    }
 
     btn.addEventListener('click', () => {
       const h = Number(document.getElementById('cal-hour').value);
@@ -124,7 +137,7 @@ function positionCalendar(fieldId) {
   const trigger  = document.getElementById(fieldId + '-trigger');
   const pop      = document.getElementById('calendar-popover');
   const rect     = trigger.getBoundingClientRect();
-  const popWidth = 340;
+  const popWidth = 336;
   let left = Math.min(rect.left, window.innerWidth - popWidth - 12);
   left = Math.max(12, left);
   pop.classList.remove('hidden');
