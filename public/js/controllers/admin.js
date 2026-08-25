@@ -45,11 +45,17 @@ const districtData = {};
 // ── View transitions ──────────────────────────────────────────────────────────
 function showList() {
   document.body.classList.remove('editor-mode');
+  if (location.hash === '#editor') {
+    history.replaceState(null, '', '/admin');
+  }
   loadAndRenderWarnings();
 }
 
 function showEditor() {
   document.body.classList.add('editor-mode');
+  if (location.hash !== '#editor') {
+    history.replaceState(null, '', '/admin#editor');
+  }
   prepareEditorForm();
   requestAnimationFrame(() => {
     initAdminMap();
@@ -369,48 +375,19 @@ async function startAdmin() {
     closeCalendar(true);
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') closeCalendar(true); });
-}
 
-// ── Login form (embedded in admin.html) ──────────────────────────────────────
-function showLoginForm(errorMsg = '') {
-  document.body.classList.remove('logged-in');
-  const err = document.getElementById('login-error');
-  if (err && errorMsg) err.textContent = errorMsg;
-}
-
-function initLoginForm() {
-  const form = document.getElementById('login-form');
-  if (!form) return;
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const user     = document.getElementById('login-user').value.trim();
-    const password = document.getElementById('login-pass').value;
-    const error    = document.getElementById('login-error');
-    error.textContent = '';
-
-    try {
-      const res  = await fetch('/api/login', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ user, password }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        startAdmin();
-      } else {
-        error.textContent = data.error || 'Login sau parolă incorectă';
-      }
-    } catch {
-      error.textContent = 'Eroare de conexiune';
-    }
-  });
+  // After a successful login the editor opens immediately.
+  // Direct visits to /admin without #editor still land on the saved-warning list.
+  if (location.hash === '#editor') {
+    showEditor();
+  }
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
-  initLoginForm();
   const authed = await checkAuth();
-  if (authed) {
-    startAdmin();
+  if (!authed) {
+    window.location.replace('/login');
+    return;
   }
-  // If not authed — login-view is already visible via CSS (body without .logged-in)
+  startAdmin();
 });

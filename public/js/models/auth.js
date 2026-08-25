@@ -14,6 +14,5 @@ async function checkAuth() {
 
 async function handleLogout() {
   await fetch('/api/logout', { method: 'POST' });
-  // Reload the same /admin page — it will show the login form
-  window.location.reload();
+  window.location.href = '/login';
 }
