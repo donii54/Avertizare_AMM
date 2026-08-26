@@ -29,11 +29,21 @@ class WarningController extends Controller
             'intervalFrom' => 'required|date',
             'intervalTo'  => 'required|date|after:intervalFrom',
             'codes'       => 'required|array|min:1',
-            'codes.*.code'        => 'required|string',
+            'codes.*.code'        => 'required|string|in:COD GALBEN,COD PORTOCALIU,COD ROȘU',
             'codes.*.description' => 'nullable|string',
             'districts'   => 'required|array|min:1',
+            'districts.*.color'   => 'required|string',
             'mapImage'    => 'nullable|string',
         ]);
+
+        if (! Warning::paintedColorsMatchCodes($data['codes'], $data['districts'])) {
+            return response()->json([
+                'message' => 'Harta conține culori care nu corespund codurilor adăugate.',
+                'errors' => [
+                    'districts' => ['Fiecare culoare de pe hartă trebuie să aibă un cod adăugat și descris, fără culori nedeclarate.'],
+                ],
+            ], 422);
+        }
 
         $warning = Warning::create([
             'phenomenon'   => $data['phenomenon'],
