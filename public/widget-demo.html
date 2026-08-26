@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Previzualizare widget</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 p-6 font-sans text-slate-800">
+  <div class="mx-auto max-w-5xl">
+    <p class="mb-2 text-sm text-slate-500">Exemplu de pagină străină cu harta încorporată. Editează harta în studio — widgetul se actualizează singur.</p>
+    <h1 class="mb-4 text-2xl font-bold">Site partener</h1>
+    <div class="overflow-hidden rounded-2xl bg-white p-4 shadow">
+      <iframe id="widget-frame" title="Hartă" width="100%" height="560" style="border:0;border-radius:12px"></iframe>
+    </div>
+  </div>
+  <script>
+    const token = location.pathname.split('/').filter(Boolean).pop();
+    document.getElementById('widget-frame').src = '/embed/' + encodeURIComponent(token);
+  </script>
+</body>
+</html>
