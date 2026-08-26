@@ -6,6 +6,47 @@ use Illuminate\Database\Eloquent\Model;
 
 class Warning extends Model
 {
+    public const CODE_COLORS = [
+        'COD GALBEN' => '#FFED00',
+        'COD PORTOCALIU' => '#FF8A00',
+        'COD ROȘU' => '#FF0000',
+    ];
+
+    /**
+     * Every painted district color must belong to a declared code,
+     * and every declared code must appear on at least one district.
+     *
+     * @param  list<array{code?: mixed}>  $codes
+     * @param  list<array{color?: mixed}>  $districts
+     */
+    public static function paintedColorsMatchCodes(array $codes, array $districts): bool
+    {
+        $declaredColors = [];
+        foreach ($codes as $entry) {
+            $code = is_array($entry) ? ($entry['code'] ?? '') : '';
+            $color = self::CODE_COLORS[$code] ?? null;
+            if ($color === null) {
+                return false;
+            }
+            $declaredColors[strtoupper($color)] = true;
+        }
+
+        if ($declaredColors === [] || $districts === []) {
+            return false;
+        }
+
+        $usedColors = [];
+        foreach ($districts as $district) {
+            $color = strtoupper((string) ($district['color'] ?? ''));
+            if ($color === '' || ! isset($declaredColors[$color])) {
+                return false;
+            }
+            $usedColors[$color] = true;
+        }
+
+        return count($usedColors) === count($declaredColors);
+    }
+
     protected $fillable = [
         'phenomenon',
         'emit_date',

@@ -270,12 +270,27 @@ function initAdminMap() {
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 function validatePaintedCodes(codes) {
-  const districts    = paintedDistricts();
-  const codeColorSet = codes.map(c => CODE_COLORS[c]).filter(Boolean);
-  if (!districts.length || !districts.some(d => codeColorSet.includes(d.color))) {
+  const districts = paintedDistricts();
+  const declaredColors = codes.map(c => CODE_COLORS[c]).filter(Boolean);
+  const declaredSet = new Set(declaredColors.map(c => c.toUpperCase()));
+
+  if (!districts.length) {
     alert('Colorează cel puțin un raion cu culoarea codului selectat');
     return false;
   }
+
+  const undeclared = districts.filter(d => !declaredSet.has(String(d.color).toUpperCase()));
+  if (undeclared.length) {
+    alert('Harta conține culori care nu au fost adăugate ca cod. Adaugă și descrie fiecare cod folosit pe hartă.');
+    return false;
+  }
+
+  const paintedSet = new Set(districts.map(d => String(d.color).toUpperCase()));
+  if (declaredColors.some(c => !paintedSet.has(c.toUpperCase()))) {
+    alert('Colorează cel puțin un raion pentru fiecare cod adăugat');
+    return false;
+  }
+
   return true;
 }
 
