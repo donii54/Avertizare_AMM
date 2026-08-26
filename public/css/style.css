@@ -504,6 +504,55 @@ body:not(.logged-in) #editor-view {
   background: #fecaca;
 }
 
+.studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.studio-header-actions a.logout-btn {
+  text-decoration: none;
+}
+.studio-preview-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+.studio-preview-link:hover { text-decoration: underline; }
+textarea.embed-code {
+  width: 100%;
+  min-height: 88px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  resize: vertical;
+}
+
+body.embed-widget {
+  margin: 0;
+  min-height: 100vh;
+  background: #e8f1f8;
+}
+.embed-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.embed-shell h1 {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 14px 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e4b8e;
+}
+#embed-map,
+#embed-map.leaflet-container {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  background: transparent;
+}
+
 /* ========== POPUP ========== */
 .overlay {
   position: fixed;

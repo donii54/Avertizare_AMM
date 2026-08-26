@@ -18,6 +18,7 @@ composer run dev
 - **Public map:** http://localhost:8000/  (no login)
 - **Login:** http://localhost:8000/login  (`admin` / `admin`)
 - **Editor:** after a successful login the browser opens `/admin#editor` (warning map editor). `/admin` without the hash shows the saved-warning list. Guests are redirected to `/login`.
+- **Map widget studio:** http://localhost:8000/studio (admin). Create a map, paint districts, copy the iframe. The public widget is http://localhost:8000/embed/{token} and refreshes itself when the map is saved. Preview: http://localhost:8000/widget-demo/{token}
 
 ### Changing admin password
 
@@ -34,28 +35,35 @@ Then: `php artisan db:seed --class=AdminUserSeeder`
 app/
   Models/Warning.php         Eloquent (SQLite): phenomenon, dates, codes, districts
   Models/AdminUser.php       Eloquent: username + bcrypt password
+  Models/EmbeddableMap.php   Eloquent: token, title, districts
   Http/Controllers/Api/
     AuthController.php       POST /api/login, /api/logout, GET /api/me
     WarningController.php    GET/POST/DELETE /api/warnings
+    EmbeddableMapController.php  GET/POST/PUT/DELETE /api/maps
   Http/Middleware/RequireAdminSession.php
+  Http/Middleware/AllowIframeEmbed.php
 
-database/migrations/         warnings + admin_users tables
+database/migrations/         warnings + admin_users + embeddable_maps
 database/seeders/            AdminUserSeeder (reads from .env)
 
 public/                      Static frontend
   index.html                 Public map (/)
   admin.html                 Admin panel (/admin)
+  studio.html                Embeddable map editor (/studio)
+  embed.html                 Iframe widget (/embed/{token})
+  widget-demo.html           Sample host page (/widget-demo/{token})
   login.html                 Login page
   js/models/warnings.js      API-driven (fetch /api/warnings)
+  js/models/maps.js          API-driven (fetch /api/maps)
   js/models/auth.js          checkAuth via /api/me
   js/views/                  Rendering functions
-  js/controllers/            Admin and public map controllers
+  js/controllers/            Admin, public map, studio, embed widget
   css/style.css
   data/MD_MAP.geojson
 
 routes/
   api.php                    All API routes
-  web.php                    / and /admin page routes
+  web.php                    /, /admin, /studio, /embed/{token}
 ```
 
 ### External CDN dependencies
