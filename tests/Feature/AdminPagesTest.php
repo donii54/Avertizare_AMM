@@ -49,8 +49,9 @@ class AdminPagesTest extends TestCase
 
     public function test_admin_phenomena_include_atmospheric_instability(): void
     {
-        $this->get('/js/controllers/admin.js')
-            ->assertOk()
-            ->assertSee("Instabilitate atmosferică (descărcări electrice)", false);
+        $this->assertStringContainsString(
+            'Instabilitate atmosferică (descărcări electrice)',
+            file_get_contents(public_path('js/controllers/admin.js')),
+        );
     }
 }
