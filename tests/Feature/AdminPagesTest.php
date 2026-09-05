@@ -46,4 +46,12 @@ class AdminPagesTest extends TestCase
             ->assertSee('Adaugă avertizare', false)
             ->assertDontSee('id="login-form"', false);
     }
+
+    public function test_admin_phenomena_include_atmospheric_instability(): void
+    {
+        $this->assertStringContainsString(
+            'Instabilitate atmosferică (descărcări electrice)',
+            file_get_contents(public_path('js/controllers/admin.js')),
+        );
+    }
 }
