@@ -10,6 +10,7 @@ const NORMAL_COLOR = '#28D762';
 
 const PHENOMENA = [
   'Obaje (descărcări electrice)',
+  'Instabilitate atmosferică (descărcări electrice)',
   'Vînt puternic și vijelie în rafale',
   'Ploi puternice',
   'Ploi torențiale',
